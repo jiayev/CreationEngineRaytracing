@@ -1,0 +1,148 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "common",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}"
+        },
+        {
+            "name": "vcpkg",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_OVERLAY_PORTS": "${sourceDir}/cmake/ports/",
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+            }
+        },
+        {
+            "name": "win64",
+            "hidden": true,
+            "architecture": "x64",
+            "cacheVariables": {
+                "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
+            }
+        },
+        {
+            "name": "msvc",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_CXX_FLAGS": "/EHsc /MP /W4 /WX $penv{CXXFLAGS}"
+            },
+            "generator": "Visual Studio 17 2022",
+            "vendor": {
+                "microsoft.com/VisualStudioSettings/CMake/1.0": {
+                    "intelliSenseMode": "windows-msvc-x64",
+                    "enableMicrosoftCodeAnalysis": true,
+                    "enableClangTidyCodeAnalysis": true
+                }
+            }
+        },
+        {
+            "name": "skyrim",
+            "cacheVariables": {
+                "BUILD_SKYRIM": true
+            },
+            "hidden": true,
+            "inherits": [ "common", "vcpkg", "win64", "msvc" ]
+        },
+        {
+            "name": "fallout4",
+            "cacheVariables": {
+                "BUILD_FALLOUT4": true
+            },
+            "hidden": true,
+            "inherits": [ "common", "vcpkg", "win64", "msvc" ]
+        },
+        {
+            "name": "SkyrimAll",
+            "cacheVariables": {
+                "ENABLE_SKYRIM_AE": "ON",
+                "ENABLE_SKYRIM_SE": "ON",
+                "ENABLE_SKYRIM_VR": "ON",
+                "AUTO_PLUGIN_DEPLOYMENT": "OFF"
+            },
+            "inherits": "skyrim"
+        },
+        {
+            "name": "Fallout4PreNG",
+            "cacheVariables": {
+                "BUILD_PRE_NG": true,
+                "BUILD_POST_NG": false,
+                "BUILD_POST_AE": false,
+                "AUTO_PLUGIN_DEPLOYMENT": "OFF"
+            },
+            "inherits": "fallout4"
+        },
+        {
+            "name": "Fallout4PostNG",
+            "cacheVariables": {
+                "BUILD_PRE_NG": false,
+                "BUILD_POST_NG": true,
+                "BUILD_POST_AE": false,
+                "AUTO_PLUGIN_DEPLOYMENT": "OFF"
+            },
+            "inherits": "fallout4"
+        },
+        {
+            "name": "Fallout4PostAE",
+            "cacheVariables": {
+                "BUILD_PRE_NG": false,
+                "BUILD_POST_NG": false,
+                "BUILD_POST_AE": true,
+                "AUTO_PLUGIN_DEPLOYMENT": "OFF"
+            },
+            "inherits": "fallout4"
+        }
+
+    ],
+    "buildPresets": [
+        {
+            "name": "Skyrim Dev",
+            "description": "Default build preset for developers, generate an AIO folder thats ready to copy",
+            "configurePreset": "SkyrimAll",
+            "configuration": "Release",
+            "targets": [ "CreationEngineRaytracing" ]
+        },
+        {
+            "name": "Skyrim Release",
+            "description": "",
+            "configurePreset": "SkyrimAll",
+            "configuration": "Release",
+            "targets": [ "CreationEngineRaytracing" ]
+        },
+        {
+            "name": "Skyrim Debug",
+            "description": "Debug build for CS SKSE plugin, generate an AIO folder thats ready to copy",
+            "configurePreset": "SkyrimAll",
+            "configuration": "Debug",
+            "targets": [ "CreationEngineRaytracing" ]
+        },
+        {
+            "name": "Fallout 4 Pre-NG",
+            "description": "",
+            "configurePreset": "Fallout4PreNG",
+            "configuration": "Release",
+            "targets": [ "CreationEngineRaytracing" ]
+        },
+        {
+            "name": "Fallout 4 Post-NG",
+            "description": "",
+            "configurePreset": "Fallout4PostNG",
+            "configuration": "Release",
+            "targets": [ "CreationEngineRaytracing" ]
+        },
+        {
+            "name": "Fallout 4 Post-AE",
+            "description": "",
+            "configurePreset": "Fallout4PostAE",
+            "configuration": "Release",
+            "targets": [ "CreationEngineRaytracing" ]
+        }
+    ]
+}

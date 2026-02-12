@@ -1,0 +1,43 @@
+{
+	"$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+	"name": "creationengineraytracing",
+	"features": {
+		"commonlibsse-ng": {
+			"description": "Dependencies of clib-ng",
+			"dependencies": [ "catch2", "fmt", "directxtk", "rapidcsv", "spdlog" ]
+		}
+	},
+	"default-features": [ "commonlibsse-ng" ],
+	"dependencies": [
+		"bshoshany-thread-pool",
+		"fmt",
+		"clib-util",
+		"cppwinrt",
+		"directx12-agility",
+		"directx-dxc",
+		"eastl",
+		"magic-enum",
+		"detours",
+		"nlohmann-json",
+		"xbyak",
+		{
+			"name": "spdlog",
+			"features": [ "wchar" ]
+		}
+	],
+	"overrides": [
+		{
+			"name": "bshoshany-thread-pool",
+			"version": "3.5.0"
+		},
+		{
+			"name": "eabase",
+			"version": "2025-08-01"
+		},
+		{
+			"name": "eastl",
+			"version": "3.27.1"
+		}
+	],
+	"builtin-baseline": "7a6bb52bfd8eba088f8bf5cae70ca8d81503e42e"
+}
