@@ -8,8 +8,8 @@
 #pragma warning(push)
 
 #if defined(SKYRIM)
-#	include <RE/Skyrim.h>
 #	include <SKSE/SKSE.h>
+#	include <RE/Skyrim.h>
 namespace logger = SKSE::log;
 #elif defined(FALLOUT4)
 #	include "F4SE/F4SE.h"
@@ -21,6 +21,8 @@ namespace logger = F4SE::log;
 #endif
 
 #pragma warning(pop)
+
+#include <xbyak/xbyak.h>
 
 #include "Windows.h"
 
