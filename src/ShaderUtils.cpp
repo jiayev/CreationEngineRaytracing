@@ -88,4 +88,15 @@ namespace ShaderUtils
 			return;
 		}
 	}
+
+	nvrhi::ShaderLibraryHandle CompileShaderLibrary(nvrhi::IDevice* device, const wchar_t* filePath, eastl::vector<DxcDefine> defines)
+	{
+		winrt::com_ptr<IDxcBlob> blob;
+		ShaderUtils::CompileShader(blob, filePath, defines);
+
+		if (!blob)
+			return nullptr;
+
+		return device->createShaderLibrary(blob->GetBufferPointer(), blob->GetBufferSize());
+	}
 };

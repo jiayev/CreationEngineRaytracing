@@ -105,25 +105,15 @@ bool State::CreateRayTracingPipeline()
 	pipelineDesc.globalBindingLayouts = { m_BindingLayout, m_BindlessLayout };
 	eastl::vector<DxcDefine> defines = { { L"USE_RAY_QUERY", L"0" } };
 
-	// Compile
-	winrt::com_ptr<IDxcBlob> rayGenBlob, missBlob, closestHitBlob;
-	ShaderUtils::CompileShader(rayGenBlob, L"data/shaders/raytracing/RayGeneration.hlsl", defines);
-	ShaderUtils::CompileShader(missBlob, L"data/shaders/raytracing/Miss.hlsl", defines);
-	ShaderUtils::CompileShader(closestHitBlob, L"data/shaders/raytracing/ClosestHit.hlsl", defines);
-
-	// Create ShaderLibrary handles (one per blob)
-	auto CreateLib = [&](winrt::com_ptr<IDxcBlob>& blob) -> nvrhi::ShaderLibraryHandle {
-		return m_NVRHIDevice->createShaderLibrary(blob->GetBufferPointer(), blob->GetBufferSize());
-	};
-
-	auto rayGenLib = CreateLib(rayGenBlob);
-	auto missLib = CreateLib(missBlob);
-	auto hitLib = CreateLib(closestHitBlob);
+	// Compile Libraries
+	auto rayGenLib = ShaderUtils::CompileShaderLibrary(m_NVRHIDevice, L"data/shaders/raytracing/RayGeneration.hlsl", defines);
+	auto missLib = ShaderUtils::CompileShaderLibrary(m_NVRHIDevice, L"data/shaders/raytracing/Miss.hlsl", defines);
+	auto hitLib = ShaderUtils::CompileShaderLibrary(m_NVRHIDevice, L"data/shaders/raytracing/ClosestHit.hlsl", defines);
 
 	// Pipeline Shaders
 	pipelineDesc.shaders = {
 		{ "RayGen", rayGenLib->getShader("Main", nvrhi::ShaderType::RayGeneration), nullptr },
-		{ "Miss", missLib->getShader("Main", nvrhi::ShaderType::Miss),            nullptr },
+		{ "Miss", missLib->getShader("Main", nvrhi::ShaderType::Miss), nullptr },
 	};
 
 	pipelineDesc.hitGroups = {
