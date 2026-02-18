@@ -1,8 +1,8 @@
-#include "Shape.h"
+#include "Mesh.h"
 #include "Util.h"
 #include "ubyte4.hlsli"
 
-void Shape::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& vertexCountIn, const uint32_t& triangleCountIn, const uint16_t& bonesPerVertex)
+void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& vertexCountIn, const uint32_t& triangleCountIn, const uint16_t& bonesPerVertex)
 {
 	auto vertexDesc = rendererData->vertexDesc;
 
@@ -50,7 +50,7 @@ void Shape::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ve
 		auto vertexSize2 = Util::Geometry::GetStoredVertexSize(*reinterpret_cast<uint64_t*>(&vertexDesc));
 
 		if (vertexSize != vertexSize2)
-			logger::warn("[RT] Shape::BuildMesh - Vertex size mismatch: {} != {}", vertexSize, vertexSize2);
+			logger::warn("[RT] Mesh::BuildMesh - Vertex size mismatch: {} != {}", vertexSize, vertexSize2);
 
 		bool hasPosition = vertexFlags & RE::BSGraphics::Vertex::VF_VERTEX;
 
@@ -227,14 +227,14 @@ void Shape::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ve
 	}
 }
 
-void Shape::CreateBuffers(const std::string& name)
+void Mesh::CreateBuffers(const std::string& name)
 {
 	auto nameWide = Util::StringToWString(name);
 
 
 }
 
-void Shape::CalculateVectors(bool calculateNormal)
+void Mesh::CalculateVectors(bool calculateNormal)
 {
 	eastl::vector<float3> normals;
 

@@ -6,7 +6,7 @@
 
 struct SceneGraph
 {
-	eastl::unordered_map<RE::BSDismemberSkinInstance*, eastl::vector<Shape*>> dismemberReferences;
+	eastl::unordered_map<RE::BSDismemberSkinInstance*, eastl::vector<Mesh*>> dismemberReferences;
 
 	// Model Path, Model data ptr
 	eastl::unordered_map<eastl::string, eastl::unique_ptr<Model>> models;

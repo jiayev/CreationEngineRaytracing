@@ -5,7 +5,7 @@
 #include "Types.h"
 #include "Geometry.h"
 
-struct Shape
+struct Mesh
 {
 	enum class Flags : uint8_t
 	{
@@ -52,6 +52,6 @@ struct Shape
 	UpdateFlags Update();
 };
 
-DEFINE_ENUM_FLAG_OPERATORS(Shape::Flags);
-DEFINE_ENUM_FLAG_OPERATORS(Shape::UpdateFlags);
-DEFINE_ENUM_FLAG_OPERATORS(Shape::State);
+DEFINE_ENUM_FLAG_OPERATORS(Mesh::Flags);
+DEFINE_ENUM_FLAG_OPERATORS(Mesh::UpdateFlags);
+DEFINE_ENUM_FLAG_OPERATORS(Mesh::State);

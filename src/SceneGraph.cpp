@@ -1,6 +1,6 @@
 #include "SceneGraph.h"
 
-#include "core/Shape.h"
+#include "core/Mesh.h"
 
 #include "Util.h"
 
@@ -126,7 +126,7 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 
 	auto rootWorldInverse = pRoot->world.Invert();
 
-	eastl::vector<eastl::unique_ptr<Shape>> shapes;
+	eastl::vector<eastl::unique_ptr<Mesh>> shapes;
 
 	// Will traverse and skip non-root fade nodes (and their children)
 	auto* validFadeNode = (formType == RE::FormType::ActorCharacter ? reinterpret_cast<RE::BSFadeNode*>(pRoot) : nullptr);
@@ -171,14 +171,14 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 			return RE::BSVisit::BSVisitControl::kContinue;
 		}
 
-		auto flags = Shape::Flags::None;
+		auto flags = Mesh::Flags::None;
 
 		// Landscape needs special handling of triangles
 		if (formType == RE::FormType::Land)
-			flags |= Shape::Flags::Landscape;
+			flags |= Mesh::Flags::Landscape;
 
 		if (geometryType.all(RE::BSGeometry::Type::kDynamicTriShape))
-			flags |= Shape::Flags::Dynamic;
+			flags |= Mesh::Flags::Dynamic;
 
 		float3x4 localToRoot;
 		XMStoreFloat3x4(&localToRoot, Util::GetXMFromNiTransform(rootWorldInverse * pGeometry->world));
@@ -198,7 +198,7 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 				return RE::BSVisit::BSVisitControl::kContinue;
 			}
 
-			auto shape = eastl::make_unique<Shape>(flags, shapeRegisters.Allocate(), pGeometry, localToRoot);
+			auto shape = eastl::make_unique<Mesh>(flags, shapeRegisters.Allocate(), pGeometry, localToRoot);
 
 			shape->BuildMesh(triShapeRD, triShapeRuntime.vertexCount, triShapeRuntime.triangleCount, 0);
 			shape->BuildMaterial(geometryRuntimeData, name, formID);
@@ -243,7 +243,7 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 
 				std::memcpy(dismemberData.data(), dismemberRuntime.partitions, dismemberNumPartitions * sizeof(RE::BSDismemberSkinInstance::Data));
 
-				eastl::tie(it, emplacedDismemberRef) = dismemberReferences.try_emplace(dismemberSkinInstance, eastl::vector<Shape*>(skinNumPartitions));
+				eastl::tie(it, emplacedDismemberRef) = dismemberReferences.try_emplace(dismemberSkinInstance, eastl::vector<Mesh*>(skinNumPartitions));
 			}
 
 			for (size_t i = 0; i < skinPartition->partitions.size(); i++) {
@@ -258,9 +258,9 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 
 				// Fix for modded geometry
 				if (partition.bonesPerVertex > 0)
-					flags |= Shape::Flags::Skinned;
+					flags |= Mesh::Flags::Skinned;
 
-				auto shape = eastl::make_unique<Shape>(flags, shapeRegisters.Allocate(), pGeometry, localToRoot, dismemberPartition.editorVisible, dismemberPartition.slot);
+				auto shape = eastl::make_unique<Mesh>(flags, shapeRegisters.Allocate(), pGeometry, localToRoot, dismemberPartition.editorVisible, dismemberPartition.slot);
 
 				// Diabolical Part II
 				if (emplacedDismemberRef)
@@ -283,7 +283,7 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 		auto model = eastl::make_unique<Model>(shapes);
 
 		// Models with these flags cannot be instanced directly
-		if (model->GetShapeFlags().any(Shape::Flags::Dynamic, Shape::Flags::Skinned))
+		if (model->GetShapeFlags().any(Mesh::Flags::Dynamic, Mesh::Flags::Skinned))
 			modelKey.append(Model::KeySuffix(pRoot).c_str());
 
 		auto [it, emplaced] = models.try_emplace(modelKey, eastl::move(model));
