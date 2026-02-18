@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ShaderUtils.h"
-#include "Utils.h"
+#include "Util.h"
 #include <dxcapi.h>
 #include <shlwapi.h>
 
@@ -14,7 +14,7 @@ namespace ShaderUtils
 			return;
 		}
 
-		std::string str = Utils::WStringToString(FilePath);
+		std::string str = Util::WStringToString(FilePath);
 
 		if (!std::filesystem::exists(FilePath)) {
 			logger::error("Failed to compile shader; {} does not exist", str);

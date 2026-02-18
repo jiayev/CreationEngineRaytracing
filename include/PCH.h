@@ -54,6 +54,7 @@ void* operator new[](size_t size, size_t alignment, size_t alignmentOffset, cons
 #include <EASTL/array.h>
 #include <EASTL/bitset.h>
 #include <EASTL/bonus/fixed_ring_buffer.h>
+#include <EASTL/deque.h>
 #include <EASTL/fixed_list.h>
 #include <EASTL/fixed_slist.h>
 #include <EASTL/fixed_vector.h>

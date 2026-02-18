@@ -50,7 +50,7 @@ void SceneGraph::CreateModel(RE::TESForm* form, const char* model, RE::NiAVObjec
 
 void SceneGraph::CreateActorModel(RE::Actor* actor, const char* name, RE::NiAVObject* root)
 {
-	TraverseScenegraphFadeNodes(root, [&](RE::BSFadeNode* fadeNode) -> RE::BSVisit::BSVisitControl {
+	Util::Traversal::ScenegraphFadeNodes(root, [&](RE::BSFadeNode* fadeNode) -> RE::BSVisit::BSVisitControl {
 		const bool isRoot = (fadeNode == root);
 
 		auto fadeNodeName = std::format("{}.{}", name, fadeNode->name.c_str());
@@ -96,7 +96,7 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 	if (!path || strlen(path) == 0)
 		return;
 
-	if (nodeInstances.find(pRoot) != nodeInstances.end()) {
+	if (instanceNodes.find(pRoot) != instanceNodes.end()) {
 		logger::warn("[RT] CreateModel \"{}\" - Instance/Model for 0x{:08X} already present.", path, reinterpret_cast<uintptr_t>(pRoot));
 		return;
 	}
@@ -126,12 +126,12 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 
 	auto rootWorldInverse = pRoot->world.Invert();
 
-	eastl::vector<eastl::unique_ptr<Mesh>> shapes;
+	eastl::vector<eastl::unique_ptr<Mesh>> meshes;
 
 	// Will traverse and skip non-root fade nodes (and their children)
 	auto* validFadeNode = (formType == RE::FormType::ActorCharacter ? reinterpret_cast<RE::BSFadeNode*>(pRoot) : nullptr);
 
-	TraverseScenegraphRTGeometries(pRoot, validFadeNode, [&](RE::BSGeometry* pGeometry)->RE::BSVisit::BSVisitControl {
+	Util::Traversal::ScenegraphRTGeometries(pRoot, validFadeNode, [&](RE::BSGeometry* pGeometry)->RE::BSVisit::BSVisitControl {
 		const char* name = pGeometry->name.c_str();
 
 		logger::trace("\t\t[RT] CreateModel::TraverseScenegraphGeometries - {}", name);
@@ -198,13 +198,13 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 				return RE::BSVisit::BSVisitControl::kContinue;
 			}
 
-			auto shape = eastl::make_unique<Mesh>(flags, shapeRegisters.Allocate(), pGeometry, localToRoot);
+			auto mesh = eastl::make_unique<Mesh>(flags, pGeometry, localToRoot);
 
-			shape->BuildMesh(triShapeRD, triShapeRuntime.vertexCount, triShapeRuntime.triangleCount, 0);
-			shape->BuildMaterial(geometryRuntimeData, name, formID);
-			shape->CreateBuffers(Util::StringToWString(name));
+			mesh->BuildMesh(triShapeRD, triShapeRuntime.vertexCount, triShapeRuntime.triangleCount, 0);
+			mesh->BuildMaterial(geometryRuntimeData, name, formID);
+			mesh->CreateBuffers(name);
 
-			shapes.push_back(eastl::move(shape));
+			meshes.push_back(eastl::move(mesh));
 		}
 		else if (auto* skinInstance = geometryRuntimeData.skinInstance.get()) {  // Skinned
 			auto& skinPartition = skinInstance->skinPartition;
@@ -260,30 +260,30 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 				if (partition.bonesPerVertex > 0)
 					flags |= Mesh::Flags::Skinned;
 
-				auto shape = eastl::make_unique<Mesh>(flags, shapeRegisters.Allocate(), pGeometry, localToRoot, dismemberPartition.editorVisible, dismemberPartition.slot);
+				auto mesh = eastl::make_unique<Mesh>(flags, pGeometry, localToRoot, dismemberPartition.editorVisible, dismemberPartition.slot);
 
 				// Diabolical Part II
 				if (emplacedDismemberRef)
-					it->second[i] = shape.get();
+					it->second[i] = mesh.get();
 
-				shape->BuildMesh(partition.buffData, skinPartition->vertexCount, partition.triangles, partition.bonesPerVertex);
-				shape->BuildMaterial(geometryRuntimeData, name, formID);
-				shape->CreateBuffers(name);
+				mesh->BuildMesh(partition.buffData, skinPartition->vertexCount, partition.triangles, partition.bonesPerVertex);
+				mesh->BuildMaterial(geometryRuntimeData, name, formID);
+				mesh->CreateBuffers(name);
 
-				shapes.push_back(eastl::move(shape));
+				meshes.push_back(eastl::move(mesh));
 			}
 		}
 
 		return RE::BSVisit::BSVisitControl::kContinue;
 		});
 
-	if (auto shapeCount = shapes.size(); shapeCount > 0) {
+	if (auto shapeCount = meshes.size(); shapeCount > 0) {
 		eastl::string modelKey = path;
 
-		auto model = eastl::make_unique<Model>(shapes);
+		auto model = eastl::make_unique<Model>(meshes);
 
 		// Models with these flags cannot be instanced directly
-		if (model->GetShapeFlags().any(Mesh::Flags::Dynamic, Mesh::Flags::Skinned))
+		if (model->GetFlags().any(Mesh::Flags::Dynamic, Mesh::Flags::Skinned))
 			modelKey.append(Model::KeySuffix(pRoot).c_str());
 
 		auto [it, emplaced] = models.try_emplace(modelKey, eastl::move(model));
@@ -292,7 +292,7 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 			if (it->second->ShouldQueueMSNConversion())
 				msnConvertionQueue.emplace_back(modelKey);
 
-			it->second->BuildBLAS(commandList.get());
+			//it->second->BuildBLAS(commandList.get());
 
 			AddInstance(formID, pRoot, modelKey);
 
@@ -307,80 +307,35 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 	}
 }
 
-static RE::BSVisit::BSVisitControl TraverseScenegraphFadeNodes(RE::NiAVObject* a_object, std::function<RE::BSVisit::BSVisitControl(RE::BSFadeNode*)> a_func)
+void SceneGraph::AddInstance(RE::FormID formID, RE::NiAVObject* node, eastl::string path)
 {
-	auto result = RE::BSVisit::BSVisitControl::kContinue;
+	logger::debug("[RT] AddInstance [0x{:08X}] - {}, Path: {}", formID, node->name, path);
 
-	if (!a_object) {
-		return result;
+	auto instanceNodeIt = instanceNodes.find(node);
+	if (instanceNodeIt != instanceNodes.end())
+		return;
+
+	auto modelIt = models.find(path);
+	if (modelIt == models.end())
+		return;
+
+
+	auto [it, emplaced] = instanceNodes.try_emplace(node, nullptr);
+	if (!emplaced)
+		return;
+
+	auto instance = eastl::make_unique<Instance>(formID, modelIt->second.get());
+
+	if (auto nodesIt = instancesFormIDs.find(formID); nodesIt != instancesFormIDs.end()) {
+		nodesIt->second.push_back(instance.get());
+	}
+	else {
+		instancesFormIDs.try_emplace(formID, eastl::vector<Instance*>{ instance.get() });
 	}
 
-	auto fadeNode = a_object->AsFadeNode();
-	if (fadeNode) {
-		result = a_func(fadeNode);
+	it->second = instance.get();
 
-		if (result == RE::BSVisit::BSVisitControl::kStop) {
-			return result;
-		}
-	}
+	instances.emplace_back(eastl::move(instance));
 
-	auto node = a_object->AsNode();
-	if (node) {
-		for (auto& child : node->GetChildren()) {
-			result = TraverseScenegraphFadeNodes(child.get(), a_func);
-			if (result == RE::BSVisit::BSVisitControl::kStop) {
-				break;
-			}
-		}
-	}
-
-	return result;
-}
-
-// A custom visit controller built to ignore billboard/particle geometry
-static RE::BSVisit::BSVisitControl TraverseScenegraphRTGeometries(RE::NiAVObject* a_object, RE::BSFadeNode* validFadeNode, std::function<RE::BSVisit::BSVisitControl(RE::BSGeometry*)> a_func)
-{
-	auto result = RE::BSVisit::BSVisitControl::kContinue;
-
-	if (!a_object) {
-		return result;
-	}
-
-	auto geom = a_object->AsGeometry();
-	if (geom) {
-		return a_func(geom);
-	}
-
-	// Doodlum sez this is faster
-	auto rtti = a_object->GetRTTI();
-
-	static REL::Relocation<const RE::NiRTTI*> billboardRTTI{ RE::NiBillboardNode::Ni_RTTI };
-	if (rtti == billboardRTTI.get())
-		return result;
-
-	// Might break vegetation
-	static REL::Relocation<const RE::NiRTTI*> orderedRTTI{ RE::BSOrderedNode::Ni_RTTI };
-	if (rtti == orderedRTTI.get())
-		return result;
-
-	auto node = a_object->AsNode();
-	if (node) {
-		for (auto& child : node->GetChildren()) {
-			if (!child)
-				continue;
-
-			if (validFadeNode) {
-				if (auto fadeNode = child->AsFadeNode(); fadeNode && fadeNode != validFadeNode) {
-					continue;
-				}
-			}
-
-			result = TraverseScenegraphRTGeometries(child.get(), validFadeNode, a_func);
-			if (result == RE::BSVisit::BSVisitControl::kStop) {
-				break;
-			}
-		}
-	}
-
-	return result;
+	modelIt->second->AddRef();
 }

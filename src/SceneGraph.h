@@ -14,8 +14,10 @@ struct SceneGraph
 	// Root node ptr, Instance data
 	eastl::vector<eastl::unique_ptr<Instance>> instances;
 
-	eastl::unordered_map<RE::NiAVObject*, Instance*> nodeInstances;
-	eastl::unordered_map<RE::FormID, eastl::vector<Instance*>> formIDInstances;
+	eastl::unordered_map<RE::NiAVObject*, Instance*> instanceNodes;
+	eastl::unordered_map<RE::FormID, eastl::vector<Instance*>> instancesFormIDs;
+
+	eastl::deque<eastl::string> msnConvertionQueue;
 
 	static SceneGraph* GetSingleton()
 	{
@@ -28,5 +30,6 @@ struct SceneGraph
 	void CreateLandModel(RE::TESObjectLAND* land);
 
 private:
-	void CreateModelInternal(RE::TESForm* form, const char* path, RE::NiAVObject* pRoot);
+	void CreateModelInternal(RE::TESForm* form, const char* path, RE::NiAVObject* node);
+	void AddInstance(RE::FormID formID, RE::NiAVObject* node, eastl::string path);
 };

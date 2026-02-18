@@ -1,10 +1,16 @@
 #include "API.h"
 #include "Scene.h"
 
-void Initialize(ID3D12Device5* device, ID3D12CommandQueue* commandQueue)
+bool Initialize(ID3D12Device5* device, ID3D12CommandQueue* commandQueue)
 {
 	auto* scene = Scene::GetSingleton();
-	scene->Initialize(device, commandQueue);
+	return scene->Initialize(device, commandQueue);
+}
+
+void SetupResources()
+{
+	auto* scene = Scene::GetSingleton();
+	scene->SetupResources();
 }
 
 void UpdateFrameBuffer(float4x4 viewInverse, float4x4 projInverse, float4 cameraData, float4 NDCToView, float3 position)

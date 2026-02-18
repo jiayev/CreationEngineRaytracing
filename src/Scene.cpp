@@ -171,6 +171,11 @@ bool Scene::CreateComputePipeline()
 	return true;
 }
 
+void Scene::SetupResources()
+{
+	frameData = eastl::make_unique<FrameData>();
+}
+
 void Scene::UpdateFrameBuffer(float4x4 viewInverse, float4x4 projInverse, float4 cameraData, float4 NDCToView, float3 position) const
 {
 	frameData->ViewInverse = viewInverse;

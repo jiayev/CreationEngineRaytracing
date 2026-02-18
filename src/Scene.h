@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/Shape.h"
+#include "core/Mesh.h"
 #include "core/Model.h"
 #include "FrameData.hlsli"
 
@@ -77,6 +77,8 @@ struct Scene
 	}
 
 	bool Initialize(ID3D12Device5* d3d12Device, ID3D12CommandQueue* commandQueue);
+
+	void SetupResources();
 
 	void UpdateFrameBuffer(float4x4 viewInverse, float4x4 projInverse, float4 cameraData, float4 NDCToView, float3 position) const;
 

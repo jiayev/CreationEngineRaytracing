@@ -17,18 +17,18 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 		bool skinned = flags.any(Flags::Skinned);
 
 		if (flags.any(Flags::Dynamic)) {
-			dynamicPosition.resize(vertexCountIn);
+			geometry.dynamicPosition.resize(vertexCountIn);
 
 			static REL::Relocation<const RE::NiRTTI*> dynamicTriShapeRTTI{ RE::BSDynamicTriShape::Ni_RTTI };
 
-			if (geometry->GetRTTI() == dynamicTriShapeRTTI.get()) {
-				auto* pDynamicTriShape = reinterpret_cast<RE::BSDynamicTriShape*>(geometry);
+			if (bsGeometryPtr->GetRTTI() == dynamicTriShapeRTTI.get()) {
+				auto* pDynamicTriShape = reinterpret_cast<RE::BSDynamicTriShape*>(bsGeometryPtr);
 
 				if (pDynamicTriShape) {
 					auto& dynTriShapeRuntime = pDynamicTriShape->GetDynamicTrishapeRuntimeData();
 
 					dynTriShapeRuntime.lock.Lock();
-					std::memcpy(dynamicPosition.data(), dynTriShapeRuntime.dynamicData, dynTriShapeRuntime.dataSize);
+					std::memcpy(geometry.dynamicPosition.data(), dynTriShapeRuntime.dynamicData, dynTriShapeRuntime.dataSize);
 					dynTriShapeRuntime.lock.Unlock();
 
 					dynamic = true;
@@ -41,10 +41,10 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 				flags.reset(Flags::Dynamic);
 		}
 
-		vertices.resize(vertexCountIn);
+		geometry.vertices.resize(vertexCountIn);
 
 		if (skinned)
-			skinning.resize(vertexCountIn);
+			geometry.skinning.resize(vertexCountIn);
 
 		auto vertexSize = Util::Geometry::GetSkyrimVertexSize(vertexFlags);
 		auto vertexSize2 = Util::Geometry::GetStoredVertexSize(*reinterpret_cast<uint64_t*>(&vertexDesc));
@@ -85,7 +85,7 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 				std::memcpy(&pos, vtx + posOffset, sizeof(float4));
 			}
 			else if (dynamic) {
-				pos = dynamicPosition[i];
+				pos = geometry.dynamicPosition[i];
 			}
 
 			min = float3::Min(min, float3(pos));
@@ -166,7 +166,7 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 				fillSkinningData(weights);
 				fillSkinningData(boneIds);
 
-				skinning[i] = Skinning(weights, boneIds);
+				geometry.skinning[i] = Skinning(weights, boneIds);
 			}
 
 			if (vertexFlags & RE::BSGraphics::Vertex::VF_LANDDATA) {
@@ -181,7 +181,7 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 				vertexData.Color.pack({ 1.0f, 1.0f, 1.0f, 1.0f });
 			}
 
-			vertices[i] = vertexData;
+			geometry.vertices[i] = vertexData;
 		}
 
 		vertexCount = vertexCountIn;
@@ -191,7 +191,7 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 	{
 		// Landscape contains no triangles, so we build them ourselves
 		if (flags.any(Flags::Landscape)) {
-			triangles.reserve(triangleCountIn);
+			geometry.triangles.reserve(triangleCountIn);
 
 			constexpr uint16_t GRID_SIZE = 16;
 			constexpr uint16_t VERTICES = GRID_SIZE + 1;
@@ -207,16 +207,16 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 						logger::critical("[RT] Quad {} {} vertex overflow: [{}, {}, {}]", x, y, v0, v1, v2);
 
 					// First triangle
-					triangles.emplace_back(v0, v1, v2);
+					geometry.triangles.emplace_back(v0, v1, v2);
 
 					// Second triangle
-					triangles.emplace_back(v1, v3, v2);
+					geometry.triangles.emplace_back(v1, v3, v2);
 				}
 			}
 		}
 		else {
-			triangles.resize(triangleCountIn);
-			std::memcpy(triangles.data(), rendererData->rawIndexData, sizeof(Triangle) * triangleCountIn);
+			geometry.triangles.resize(triangleCountIn);
+			std::memcpy(geometry.triangles.data(), rendererData->rawIndexData, sizeof(Triangle) * triangleCountIn);
 		}
 
 		triangleCount = triangleCountIn;
@@ -227,11 +227,34 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 	}
 }
 
+void Mesh::BuildMaterial([[maybe_unused]] const RE::BSGeometry::GEOMETRY_RUNTIME_DATA& geometryRuntimeData, [[maybe_unused]] const char* name, [[maybe_unused]] RE::FormID formID)
+{
+
+}
+
 void Mesh::CreateBuffers(const std::string& name)
 {
 	auto nameWide = Util::StringToWString(name);
+}
 
+// State is set as pending first, final state is updated after BLAS rebuild call
+void Mesh::SetPendingState(State stateIn, bool activate)
+{
+	if (activate)
+		pendingState |= stateIn;
+	else
+		pendingState &= ~stateIn;
+}
 
+void Mesh::UpdateDismember(bool enable)
+{
+	SetPendingState(State::DismemberHidden, !enable);
+}
+
+// Updates state from pending
+void Mesh::UpdateState()
+{
+	state = pendingState;
 }
 
 void Mesh::CalculateVectors(bool calculateNormal)
@@ -245,10 +268,10 @@ void Mesh::CalculateVectors(bool calculateNormal)
 	tangents.resize(vertexCount, float3(0, 0, 0));
 
 	// Loop over triangles
-	for (auto& t : triangles) {
-		Vertex& v0 = vertices[t.x];
-		Vertex& v1 = vertices[t.y];
-		Vertex& v2 = vertices[t.z];
+	for (auto& t : geometry.triangles) {
+		Vertex& v0 = geometry.vertices[t.x];
+		Vertex& v1 = geometry.vertices[t.y];
+		Vertex& v2 = geometry.vertices[t.z];
 
 		float3 pos0 = v0.Position;
 		float3 pos1 = v1.Position;
@@ -292,7 +315,7 @@ void Mesh::CalculateVectors(bool calculateNormal)
 
 	// Normalize and orthogonalize
 	for (size_t i = 0; i < vertexCount; i++) {
-		auto& v = vertices[i];
+		auto& v = geometry.vertices[i];
 
 		float3 n = Util::Normalize(calculateNormal ? normals[i] : float3(v.Normal));
 
