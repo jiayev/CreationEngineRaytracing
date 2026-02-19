@@ -8,7 +8,9 @@ struct Model
 {
 	eastl::vector<eastl::unique_ptr<Mesh>> meshes;
 
-	nvrhi::rt::AccelStructHandle accelStruct;
+	nvrhi::rt::AccelStructDesc blasDesc;
+
+	nvrhi::rt::AccelStructHandle blas;
 
 	Model(eastl::vector<eastl::unique_ptr<Mesh>>& meshes) :
 		meshes(eastl::move(meshes))
@@ -54,9 +56,9 @@ struct Model
 		return D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
 	}
 
-	void BuildBLAS(ID3D12GraphicsCommandList4* commandList);
+	void BuildBLAS();
 
-	bool UpdateBLAS(ID3D12GraphicsCommandList4* commandList);
+	bool UpdateBLAS();
 
 	void AddRef()
 	{

@@ -59,6 +59,8 @@ struct Mesh
 		std::shared_ptr<DescriptorHandle> triangleBufferDescriptor;
 	} buffers;
 
+	nvrhi::rt::GeometryDesc geometryDesc;
+
 	Material material;
 
 	stl::enumeration<Flags, uint8_t> flags = Flags::None;

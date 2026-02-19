@@ -19,6 +19,18 @@ void UpdateFrameBuffer(float4x4 viewInverse, float4x4 projInverse, float4 camera
 	scene->UpdateFrameBuffer(viewInverse, projInverse, cameraData, NDCToView, position);
 }
 
+void Execute()
+{
+	auto* scene = Scene::GetSingleton();
+	scene->Execute();
+}
+
+void WaitExecution()
+{
+	auto* scene = Scene::GetSingleton();
+	scene->WaitExecution();
+}
+
 void AttachModel(RE::TESForm* form)
 {
 	auto* scene = Scene::GetSingleton();

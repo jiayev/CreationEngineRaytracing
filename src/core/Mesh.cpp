@@ -2,6 +2,8 @@
 #include "Util.h"
 #include "ubyte4.hlsli"
 
+#include "Scene.h"
+
 void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& vertexCountIn, const uint32_t& triangleCountIn, const uint16_t& bonesPerVertex)
 {
 	auto vertexDesc = rendererData->vertexDesc;
@@ -234,7 +236,51 @@ void Mesh::BuildMaterial([[maybe_unused]] const RE::BSGeometry::GEOMETRY_RUNTIME
 
 void Mesh::CreateBuffers(const std::string& name)
 {
-	auto nameWide = Util::StringToWString(name);
+	auto scene = Scene::GetSingleton();
+
+	// Vertex Buffer
+	{
+		const size_t size = sizeof(Vertex) * vertexCount;
+
+		auto vertexBufferDesc = nvrhi::BufferDesc()
+			.setByteSize(size)
+			.setIsVertexBuffer(true)
+			.enableAutomaticStateTracking(nvrhi::ResourceStates::VertexBuffer)
+			.setIsAccelStructBuildInput(true)
+			.setDebugName(name + " (Vertex Buffer)");
+
+		buffers.vertexBuffer = scene->m_NVRHIDevice->createBuffer(vertexBufferDesc);
+
+		scene->m_CommandList->writeBuffer(buffers.vertexBuffer.Get(), geometry.vertices.data(), size);
+	}
+
+	// Triangle Buffer
+	{
+		const size_t size = sizeof(Triangle) * triangleCount;
+
+		auto triangleBufferDesc = nvrhi::BufferDesc()
+			.setByteSize(size)
+			.setIsIndexBuffer(true)
+			.enableAutomaticStateTracking(nvrhi::ResourceStates::IndexBuffer)
+			.setIsAccelStructBuildInput(true)
+			.setDebugName(name + " (Triangle Buffer)");
+
+		buffers.triangleBuffer = scene->m_NVRHIDevice->createBuffer(triangleBufferDesc);
+
+		scene->m_CommandList->writeBuffer(buffers.triangleBuffer.Get(), geometry.triangles.data(), size);
+	}
+
+	// Geometry descriptor
+	auto geometryTriangles = nvrhi::rt::GeometryTriangles()
+		.setVertexBuffer(buffers.vertexBuffer)
+		.setVertexFormat(nvrhi::Format::RGB32_FLOAT)
+		.setVertexCount(vertexCount)
+		.setVertexStride(sizeof(Vertex))
+		.setIndexBuffer(buffers.triangleBuffer)
+		.setIndexFormat(nvrhi::Format::R16_FLOAT)
+		.setIndexCount(triangleCount * 3);
+
+	geometryDesc = nvrhi::rt::GeometryDesc().setTriangles(geometryTriangles);
 }
 
 // State is set as pending first, final state is updated after BLAS rebuild call

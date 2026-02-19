@@ -1,6 +1,8 @@
 #include "Scene.h"
 #include "Util.h"
 
+#include "SceneGraph.h"
+
 #include "framework/DescriptorTableManager.h"
 
 #include <nvrhi/validation.h>
@@ -52,9 +54,6 @@ bool Scene::Initialize(ID3D12Device5* d3d12Device, ID3D12CommandQueue* commandQu
 	device = d3d12Device;
 
 	CreateRootSignature();
-
-	m_ConstantBuffer = m_NVRHIDevice->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
-		sizeof(FrameData), "LightingConstants", Constants::MAX_CB_VERSIONS));
 
 	if (settings.UseRayQuery)
 	{
@@ -171,9 +170,46 @@ bool Scene::CreateComputePipeline()
 	return true;
 }
 
+void Scene::SetScreenSize(uint16_t width, uint16_t height)
+{
+	pendingRenderSize = { width, height };
+}
+
 void Scene::SetupResources()
 {
 	frameData = eastl::make_unique<FrameData>();
+
+	m_ConstantBuffer = m_NVRHIDevice->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
+		sizeof(FrameData), "Frame Buffer", Constants::MAX_CB_VERSIONS));
+
+	m_LinearWrapSampler = m_NVRHIDevice->createSampler(
+		nvrhi::SamplerDesc()
+		.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap)
+		.setAllFilters(true));
+}
+
+void Scene::CheckResolutionResources()
+{
+	if (renderSize == pendingRenderSize)
+		return;
+
+	renderSize = pendingRenderSize;
+
+	// Output Texture
+	{
+		nvrhi::TextureDesc desc;
+		desc.width = renderSize.x;
+		desc.height = renderSize.y;
+		desc.isUAV = true;
+		desc.keepInitialState = true;
+		desc.format = nvrhi::Format::RGBA16_FLOAT;
+		desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+		desc.debugName = "Output Texture";
+
+		m_OutputTexture = m_NVRHIDevice->createTexture(desc);
+	}
+
+	dirtyBindings = true;
 }
 
 void Scene::UpdateFrameBuffer(float4x4 viewInverse, float4x4 projInverse, float4 cameraData, float4 NDCToView, float3 position) const
@@ -183,6 +219,83 @@ void Scene::UpdateFrameBuffer(float4x4 viewInverse, float4x4 projInverse, float4
 	frameData->CameraData = cameraData;
 	frameData->NDCToView = NDCToView;
 	frameData->Position = position;
+}
+
+void Scene::UpdateAccelStructs(nvrhi::ICommandList* commandList)
+{
+	auto* sceneGraph = SceneGraph::GetSingleton();
+
+	instances.clear();
+	instances.reserve(sceneGraph->instances.size());
+
+	for (auto& instance: sceneGraph->instances)
+	{
+		instances.push_back(instance->GetInstanceDesc());
+	}
+
+	// Compact acceleration structures that are tagged for compaction and have finished executing the original build
+	commandList->compactBottomLevelAccelStructs();
+
+	uint32_t topLevelInstances = static_cast<uint32_t>(instances.size());
+
+	if (!m_TopLevelAS || topLevelInstances > m_TopLevelInstances - Constants::NUM_INSTANCES_THRESHOLD) {
+		float topLevelInstancesRatio = std::ceil(topLevelInstances / static_cast<float>(Constants::NUM_INSTANCES_STEP));
+
+		uint32_t topLevelMaxInstances = static_cast<uint32_t>(topLevelInstancesRatio) * Constants::NUM_INSTANCES_STEP;
+
+		m_TopLevelInstances = std::max(topLevelMaxInstances + Constants::NUM_INSTANCES_STEP, Constants::NUM_INSTANCES_MIN);
+
+		nvrhi::rt::AccelStructDesc tlasDesc;
+		tlasDesc.isTopLevel = true;
+		tlasDesc.topLevelMaxInstances = m_TopLevelInstances;
+		m_TopLevelAS = m_NVRHIDevice->createAccelStruct(tlasDesc);
+
+		dirtyBindings = true;
+	}
+
+	commandList->beginMarker("TLAS Update");
+	commandList->buildTopLevelAccelStruct(m_TopLevelAS, instances.data(), instances.size());
+	commandList->endMarker();
+}
+
+void Scene::CheckBindings()
+{
+	if (!dirtyBindings)
+		return;
+
+	nvrhi::BindingSetDesc bindingSetDesc;
+	bindingSetDesc.bindings = {
+		nvrhi::BindingSetItem::ConstantBuffer(0, m_ConstantBuffer),
+		nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_TopLevelAS),
+		nvrhi::BindingSetItem::Sampler(0, m_LinearWrapSampler),
+		nvrhi::BindingSetItem::Texture_UAV(0, m_OutputTexture)
+	};
+
+	m_BindingSet = m_NVRHIDevice->createBindingSet(bindingSetDesc, m_BindingLayout);
+
+	dirtyBindings = false;
+}
+
+void Scene::Execute()
+{
+	m_CommandList->writeBuffer(m_ConstantBuffer.Get(), frameData.get(), sizeof(FrameData));
+
+	UpdateAccelStructs(m_CommandList);
+
+	CheckResolutionResources();
+
+	CheckBindings();
+
+	m_CommandList->close();
+	lastSubmittedInstance = m_NVRHIDevice->executeCommandList(m_CommandList.Get());
+
+	m_NVRHIDevice->runGarbageCollection();
+}
+
+void Scene::WaitExecution() const
+{
+	m_NVRHIDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, lastSubmittedInstance);
+	m_NVRHIDevice->runGarbageCollection();
 }
 
 void Scene::AttachModel([[maybe_unused]] RE::TESForm* form) {

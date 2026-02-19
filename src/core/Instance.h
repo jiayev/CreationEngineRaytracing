@@ -21,4 +21,15 @@ struct Instance
 
 	// Makes sure we only update once per frame
 	uint64_t lastUpdate = 0;
+
+	nvrhi::rt::InstanceDesc GetInstanceDesc() const
+	{
+		nvrhi::rt::InstanceDesc instanceDesc;
+		instanceDesc.bottomLevelAS = model->blas;
+		assert(instanceDesc.bottomLevelAS);
+		instanceDesc.instanceMask = 1;
+		instanceDesc.instanceID = 0;
+		memcpy(instanceDesc.transform, transform.m, sizeof(transform.m));
+		return instanceDesc;
+	}
 };

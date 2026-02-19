@@ -58,11 +58,24 @@ struct Scene
 	nvrhi::BufferHandle m_ConstantBuffer;
 
 	std::shared_ptr<DescriptorTableManager> m_DescriptorTable;
-	nvrhi::TextureHandle m_ColorBuffer;
+	nvrhi::TextureHandle m_OutputTexture;
 
 	eastl::unique_ptr<FrameData> frameData;
 
+	nvrhi::SamplerHandle m_LinearWrapSampler;
+
 	eastl::unordered_map<eastl::string, eastl::unique_ptr<Model*>> models;
+
+	uint64_t lastSubmittedInstance = 0;
+
+	uint2 renderSize;
+	uint2 pendingRenderSize;
+
+	eastl::vector<nvrhi::rt::InstanceDesc> instances;
+
+	uint32_t m_TopLevelInstances = 0;
+
+	bool dirtyBindings = true;
 
 	struct Settings
 	{
@@ -80,6 +93,12 @@ struct Scene
 
 	void SetupResources();
 
+	void SetScreenSize(uint16_t width, uint16_t height);
+
+	void CheckResolutionResources();
+
+	void CheckBindings();
+
 	void UpdateFrameBuffer(float4x4 viewInverse, float4x4 projInverse, float4 cameraData, float4 NDCToView, float3 position) const;
 
 	void CreateRootSignature();
@@ -87,6 +106,12 @@ struct Scene
 	bool CreateRayTracingPipeline();
 
 	bool CreateComputePipeline();
+
+	void UpdateAccelStructs(nvrhi::ICommandList* commandList);
+
+	void Execute();
+
+	void WaitExecution() const;
 
 	void InitializeLog(spdlog::level::level_enum a_level);
 

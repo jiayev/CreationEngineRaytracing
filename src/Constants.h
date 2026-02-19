@@ -7,4 +7,8 @@ namespace Constants
 	static constexpr uint32_t PLAYER_REFR_FORMID = 0x00000014;
 
 	static constexpr uint32_t MATERIAL_NORMALMAP_ID = 1;
+
+	static constexpr uint32_t NUM_INSTANCES_MIN = 1024;
+	static constexpr uint32_t NUM_INSTANCES_THRESHOLD = 256;
+	static constexpr uint32_t NUM_INSTANCES_STEP = 512;
 }
