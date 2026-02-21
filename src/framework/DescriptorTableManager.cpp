@@ -27,7 +27,7 @@ DescriptorHandle::DescriptorHandle()
 {
 }
 
-DescriptorHandle::DescriptorHandle(const std::shared_ptr<DescriptorTableManager>& managerPtr, DescriptorIndex index)
+DescriptorHandle::DescriptorHandle(const eastl::shared_ptr<DescriptorTableManager>& managerPtr, DescriptorIndex index)
     : m_Manager(managerPtr)
     , m_DescriptorIndex(index)
 {
@@ -49,7 +49,7 @@ DescriptorIndex DescriptorHandle::GetIndexInHeap() const
     if (m_DescriptorIndex >= 0)
     {
         assert(!m_Manager.expired());
-        if (std::shared_ptr<DescriptorTableManager> manager = m_Manager.lock())
+        if (eastl::shared_ptr<DescriptorTableManager> manager = m_Manager.lock())
         {
             return manager->GetDescriptorTable()->getFirstDescriptorIndexInHeap() + m_DescriptorIndex;
         }

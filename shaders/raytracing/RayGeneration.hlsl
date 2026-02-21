@@ -1,6 +1,7 @@
 #include "raytracing/include/Common.hlsli"
 #include "raytracing/include/Registers.hlsli"
 #include "raytracing/include/Payload.hlsli"
+#include "raytracing/include/Geometry.hlsli"
 
 [shader("raygeneration")]
 void Main()
@@ -49,9 +50,24 @@ void Main()
     TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
 #endif
     
-    float hit = payload.Hit() ? 1.0f : 0.0f;
+    float3 color = float3(0.0f, 0.0f, 0.0f);
     
-    float2 uv = (idx + 0.5f) / size;
+    if (payload.Hit())
+    {
+        float3 uvw = GetBary(payload.Barycentrics());
+
+        Instance instance;
+        Mesh mesh = GetMesh(payload, instance);
+        
+        Vertex v0, v1, v2;
+        GetVertices(mesh.GeometryIdx, payload.primitiveIndex, v0, v1, v2);       
+        
+        float3x3 objectToWorld3x3 = mul((float3x3) instance.Transform, (float3x3) mesh.Transform);
+        
+        float3 normalWS = normalize(mul(objectToWorld3x3, Interpolate(v0.Normal, v1.Normal, v2.Normal, uvw)));
+        
+        color = normalWS * 0.5f + 0.5f;
+    }
     
-    Output[idx] = float4(hit, uv, 1.0f);
+    Output[idx] = float4(color, 1.0f);
 }

@@ -18,11 +18,8 @@ class RaytracingPass : public RenderPass
 
 	nvrhi::BindingLayoutHandle m_BindingLayout;
 	nvrhi::BindingSetHandle m_BindingSet;
-	nvrhi::BindingLayoutHandle m_BindlessLayout;
 
 	nvrhi::rt::AccelStructHandle m_TopLevelAS;
-
-	eastl::shared_ptr<DescriptorTableManager> m_DescriptorTable;
 
 	nvrhi::SamplerHandle m_LinearWrapSampler;
 

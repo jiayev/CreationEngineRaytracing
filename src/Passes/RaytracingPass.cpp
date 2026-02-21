@@ -41,29 +41,20 @@ void RaytracingPass::CreateRootSignature()
 	globalBindingLayoutDesc.bindings = {
 		nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
 		nvrhi::BindingLayoutItem::RayTracingAccelStruct(0),
+		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1),
+		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2),
 		nvrhi::BindingLayoutItem::Sampler(0),
 		nvrhi::BindingLayoutItem::Texture_UAV(0)
 	};
 	m_BindingLayout = GetRenderer()->GetDevice()->createBindingLayout(globalBindingLayoutDesc);
-
-	nvrhi::BindlessLayoutDesc bindlessLayoutDesc;
-	bindlessLayoutDesc.visibility = nvrhi::ShaderType::All;
-	bindlessLayoutDesc.firstSlot = 0;
-	bindlessLayoutDesc.maxCapacity = 4096;
-	bindlessLayoutDesc.registerSpaces = {
-		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1),
-		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2)
-		//nvrhi::BindingLayoutItem::Texture_SRV(3)
-	};
-	m_BindlessLayout = GetRenderer()->GetDevice()->createBindlessLayout(bindlessLayoutDesc);
-
-	m_DescriptorTable = eastl::make_shared<DescriptorTableManager>(GetRenderer()->GetDevice(), m_BindlessLayout);
 }
 
 bool RaytracingPass::CreateRayTracingPipeline()
 {
+	auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
+
 	nvrhi::rt::PipelineDesc pipelineDesc;
-	pipelineDesc.globalBindingLayouts = { m_BindingLayout, m_BindlessLayout };
+	pipelineDesc.globalBindingLayouts = { m_BindingLayout, sceneGraph->GetMeshDescriptors()->m_Layout, sceneGraph->GetTextureDescriptors()->m_Layout };
 	eastl::vector<DxcDefine> defines = { { L"USE_RAY_QUERY", L"0" } };
 
 	auto device = GetRenderer()->GetDevice();
@@ -121,10 +112,13 @@ bool RaytracingPass::CreateComputePipeline()
 	if (!m_ComputeShader)
 		return false;
 
+	auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
+
 	auto pipelineDesc = nvrhi::ComputePipelineDesc()
 		.setComputeShader(m_ComputeShader)
 		.addBindingLayout(m_BindingLayout)
-		.addBindingLayout(m_BindlessLayout);
+		.addBindingLayout(sceneGraph->GetMeshDescriptors()->m_Layout)
+		.addBindingLayout(sceneGraph->GetTextureDescriptors()->m_Layout);
 
 	m_ComputePipeline = GetRenderer()->GetDevice()->createComputePipeline(pipelineDesc);
 
@@ -182,10 +176,14 @@ void RaytracingPass::CheckBindings()
 
 	auto* renderer = GetRenderer();
 
+	auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
+
 	nvrhi::BindingSetDesc bindingSetDesc;
 	bindingSetDesc.bindings = {
 		nvrhi::BindingSetItem::ConstantBuffer(0, renderer->GetCameraDataBuffer()),
 		nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_TopLevelAS),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, sceneGraph->GetInstanceDataBuffer()),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(2,sceneGraph->GetMeshDataBuffer()),
 		nvrhi::BindingSetItem::Sampler(0, m_LinearWrapSampler),
 		nvrhi::BindingSetItem::Texture_UAV(0, renderer->GetMainTexture())
 	};
@@ -201,13 +199,21 @@ void RaytracingPass::Execute(nvrhi::ICommandList* commandList)
 
 	CheckBindings();
 
+	auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
+
+	nvrhi::BindingSetVector bindings = { 
+		m_BindingSet, 
+		sceneGraph->GetMeshDescriptors()->m_DescriptorTable->GetDescriptorTable(),
+		sceneGraph->GetTextureDescriptors()->m_DescriptorTable->GetDescriptorTable() 
+	};
+
 	auto resolution = Renderer::GetSingleton()->GetResolution();
 
 	if (m_RayPipeline)
 	{
 		nvrhi::rt::State state;
 		state.shaderTable = m_ShaderTable;
-		state.bindings = { m_BindingSet, m_DescriptorTable->GetDescriptorTable() };
+		state.bindings = bindings;
 		commandList->setRayTracingState(state);
 
 		nvrhi::rt::DispatchRaysArguments args;
@@ -219,7 +225,7 @@ void RaytracingPass::Execute(nvrhi::ICommandList* commandList)
 	{
 		nvrhi::ComputeState state;
 		state.pipeline = m_ComputePipeline;
-		state.bindings = { m_BindingSet, m_DescriptorTable->GetDescriptorTable() };
+		state.bindings = bindings;
 		commandList->setComputeState(state);
 
 		auto threadGroupSize = Util::GetDispatchCount(resolution);

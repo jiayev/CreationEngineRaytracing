@@ -3,6 +3,7 @@
 #include "core/Mesh.h"
 #include "core/Model.h"
 #include "SceneGraph.h"
+#include "Types/RendererParams.h"
 
 struct Scene
 {
@@ -20,6 +21,8 @@ struct Scene
 	}
 
 	SceneGraph* GetSceneGraph() const;
+
+	bool Initialize(RendererParams rendererParams);
 
 	void Update(nvrhi::ICommandList* commandList);
 

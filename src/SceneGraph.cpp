@@ -5,6 +5,95 @@
 #include "Renderer.h"
 #include "Util.h"
 
+void SceneGraph::Initialize()
+{
+	auto device = Renderer::GetSingleton()->GetDevice();
+
+	auto createStructuredBuffer = [&](size_t size, const char* name) {
+		auto bufferDesc = nvrhi::BufferDesc()
+			.setByteSize(size)
+			.setStructStride(static_cast<uint32_t>(size))
+			.enableAutomaticStateTracking(nvrhi::ResourceStates::ShaderResource)
+			.setDebugName(name);
+
+		return device->createBuffer(bufferDesc);
+	};
+
+	// Mesh Data Buffer
+	m_MeshDataBuffer = createStructuredBuffer(sizeof(MeshData) * Constants::NUM_MESHES_MAX, "Mesh Data Buffer");
+
+	// Instance Data Buffer
+	m_InstanceDataBuffer = createStructuredBuffer(sizeof(InstanceData) * Constants::NUM_INSTANCES_MAX, "Instance Data Buffer");
+
+	// Mesh bindless descriptor table
+	{
+		nvrhi::BindlessLayoutDesc bindlessLayoutDesc;
+		bindlessLayoutDesc.visibility = nvrhi::ShaderType::All;
+		bindlessLayoutDesc.firstSlot = 0;
+		bindlessLayoutDesc.maxCapacity = Constants::NUM_MESHES_MIN;
+		bindlessLayoutDesc.registerSpaces = {
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2)
+		};
+
+		m_MeshDescriptors = eastl::make_unique<BindlessTable>(device, bindlessLayoutDesc);
+	}
+
+	// Texture bindless descriptor table
+	{
+		nvrhi::BindlessLayoutDesc bindlessLayoutDesc;
+		bindlessLayoutDesc.visibility = nvrhi::ShaderType::All;
+		bindlessLayoutDesc.firstSlot = 0;
+		bindlessLayoutDesc.maxCapacity = Constants::NUM_TEXTURES_MIN;
+		bindlessLayoutDesc.registerSpaces = {
+			nvrhi::BindingLayoutItem::Texture_SRV(3)
+		};
+
+		m_TextureDescriptors = eastl::make_unique<BindlessTable>(device, bindlessLayoutDesc);
+	}
+}
+
+void SceneGraph::Update(nvrhi::ICommandList* commandList)
+{
+	for (auto& [path, model] : m_Models)
+	{
+		model->Update();
+	}
+
+	uint32_t meshIndex = 0;
+	uint32_t instanceIndex = 0;
+
+	for (auto& instance : m_Instances)
+	{
+		instance->Update();
+
+		//sceneGraph->MeshData()[instanceIndex] = 
+
+		uint32_t firstMeshIndex = meshIndex;
+
+		for (auto& mesh : instance->model->meshes)
+		{
+			m_MeshData[meshIndex] = mesh->GetData();
+			meshIndex++;
+		}
+
+		// No visible shape in instance
+		if (meshIndex == firstMeshIndex)
+			continue;
+
+		m_InstanceData[instanceIndex] = {
+			instance->transform,
+			LightData(),
+			firstMeshIndex
+		};
+
+		instanceIndex++;
+	}
+
+	commandList->writeBuffer(m_MeshDataBuffer, m_MeshData.data(), meshIndex * sizeof(MeshData));
+	commandList->writeBuffer(m_InstanceDataBuffer, m_InstanceData.data(), instanceIndex * sizeof(InstanceData));
+}
+
 void SceneGraph::CreateModel(RE::TESForm* form, const char* model, RE::NiAVObject* root)
 {
 	if (!root) {
@@ -199,11 +288,10 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 				return RE::BSVisit::BSVisitControl::kContinue;
 			}
 
-			auto mesh = eastl::make_unique<Mesh>(flags, pGeometry, localToRoot);
+			auto mesh = eastl::make_unique<Mesh>(flags, name, pGeometry, localToRoot);
 
 			mesh->BuildMesh(triShapeRD, triShapeRuntime.vertexCount, triShapeRuntime.triangleCount, 0);
-			mesh->BuildMaterial(geometryRuntimeData, name, formID);
-			mesh->CreateBuffers(Renderer::GetSingleton()->GetCommandList(), name);
+			mesh->BuildMaterial(geometryRuntimeData, formID);
 
 			meshes.push_back(eastl::move(mesh));
 		}
@@ -261,15 +349,14 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 				if (partition.bonesPerVertex > 0)
 					flags |= Mesh::Flags::Skinned;
 
-				auto mesh = eastl::make_unique<Mesh>(flags, pGeometry, localToRoot, dismemberPartition.editorVisible, dismemberPartition.slot);
+				auto mesh = eastl::make_unique<Mesh>(flags, name, pGeometry, localToRoot, dismemberPartition.editorVisible, dismemberPartition.slot);
 
 				// Diabolical Part II
 				if (emplacedDismemberRef)
 					it->second[i] = mesh.get();
 
 				mesh->BuildMesh(partition.buffData, skinPartition->vertexCount, partition.triangles, partition.bonesPerVertex);
-				mesh->BuildMaterial(geometryRuntimeData, name, formID);
-				mesh->CreateBuffers(Renderer::GetSingleton()->GetCommandList(), name);
+				mesh->BuildMaterial(geometryRuntimeData, formID);
 
 				meshes.push_back(eastl::move(mesh));
 			}
@@ -279,25 +366,24 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 		});
 
 	if (auto shapeCount = meshes.size(); shapeCount > 0) {
-		eastl::string modelKey = path;
+		auto model = eastl::make_unique<Model>(path, pRoot, meshes);
 
-		auto model = eastl::make_unique<Model>(meshes);
+		auto& modelName = model->m_Name;
 
-		// Models with these flags cannot be instanced directly
-		if (model->GetMeshFlags().any(Mesh::Flags::Dynamic, Mesh::Flags::Skinned))
-			modelKey.append(Model::KeySuffix(pRoot).c_str());
-
-		auto [it, emplaced] = m_Models.try_emplace(modelKey, eastl::move(model));
+		auto [it, emplaced] = m_Models.try_emplace(modelName, eastl::move(model));
 
 		if (emplaced) {
-			if (it->second->ShouldQueueMSNConversion())
-				m_MSNConvertionQueue.emplace_back(modelKey);
+			auto* modelPtr = it->second.get();
 
-			it->second->BuildBLAS(Renderer::GetSingleton()->GetCommandList());
+			if (modelPtr->ShouldQueueMSNConversion())
+				m_MSNConvertionQueue.emplace_back(modelName);
 
-			AddInstance(formID, pRoot, modelKey);
+			modelPtr->CreateBuffers(this, Renderer::GetSingleton()->GetCommandList());
+			modelPtr->BuildBLAS(Renderer::GetSingleton()->GetCommandList());
 
-			logger::debug("[RT] CreateModel - Commited {} TriShapes to [0x{:08X}]", shapeCount, reinterpret_cast<uintptr_t>(it->second.get()));
+			AddInstance(formID, pRoot, modelName);
+
+			logger::debug("[RT] CreateModel - Commited {} TriShapes to [0x{:08X}]", shapeCount, reinterpret_cast<uintptr_t>(modelPtr));
 		}
 		else {
 			logger::warn("[RT] CreateModel - Emplace failed for {} TriShapes", shapeCount);

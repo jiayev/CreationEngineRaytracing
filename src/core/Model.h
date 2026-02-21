@@ -4,6 +4,8 @@
 
 #include "Mesh.h"
 
+class SceneGraph;
+
 struct Model
 {
 	enum class UpdateFlags : uint8_t {
@@ -11,30 +13,17 @@ struct Model
 		Rebuild = 1 << 1
 	};
 
+	eastl::string m_Name;
+
 	eastl::vector<eastl::unique_ptr<Mesh>> meshes;
 
 	nvrhi::rt::AccelStructDesc blasDesc;
 
 	nvrhi::rt::AccelStructHandle blas;
 
-	Model(eastl::vector<eastl::unique_ptr<Mesh>>& meshes) :
-		meshes(eastl::move(meshes))
-	{
-		for (auto& mesh : this->meshes) {
-			meshFlags.set(mesh->flags.get());
-			shaderTypes |= mesh->material.shaderType;
-			features |= static_cast<int>(mesh->material.Feature);
-			shaderFlags.set(mesh->material.shaderFlags.get());
-		}
+	Model(eastl::string name, RE::NiAVObject* node, eastl::vector<eastl::unique_ptr<Mesh>>& meshes);
 
-		blasDesc.setDebugName("BLAS")
-			.setIsTopLevel(false);
-
-		if (meshFlags.none(Mesh::Flags::Dynamic, Mesh::Flags::Skinned))
-			blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
-		else
-			blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace | nvrhi::rt::AccelStructBuildFlags::AllowCompaction;
-	}
+	void CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandList);
 
 	static std::string KeySuffix(RE::NiAVObject* root)
 	{

@@ -2,12 +2,42 @@
 #include "Scene.h"
 #include "Renderer.h"
 
+Model::Model(eastl::string name, RE::NiAVObject* node, eastl::vector<eastl::unique_ptr<Mesh>>& meshes) :
+	m_Name(name), meshes(eastl::move(meshes))
+{
+	for (auto& mesh : this->meshes) {
+		meshFlags.set(mesh->flags.get());
+		shaderTypes |= mesh->material.shaderType;
+		features |= static_cast<int>(mesh->material.Feature);
+		shaderFlags.set(mesh->material.shaderFlags.get());
+	}
+
+	// Models with these flags cannot be instanced directly
+	if (meshFlags.any(Mesh::Flags::Dynamic, Mesh::Flags::Skinned))
+		m_Name.append(Model::KeySuffix(node).c_str());
+
+	blasDesc.setDebugName("BLAS")
+		.setIsTopLevel(false);
+
+	if (meshFlags.none(Mesh::Flags::Dynamic, Mesh::Flags::Skinned))
+		blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
+	else
+		blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace | nvrhi::rt::AccelStructBuildFlags::AllowCompaction;
+}
+
+void Model::CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandList)
+{
+	for (auto& mesh : meshes) {
+		mesh->CreateBuffers(sceneGraph, commandList);
+	}
+}
+
 void Model::Update()
 {
-	auto& blasGeoms = blasDesc.bottomLevelGeometries;
+	/*auto& blasGeoms = blasDesc.bottomLevelGeometries;
 
 	blasGeoms.clear();
-	blasGeoms.reserve(meshes.size());
+	blasGeoms.reserve(meshes.size());*/
 
 	for (auto& mesh : meshes) {
 		auto updateFlags = mesh->Update();

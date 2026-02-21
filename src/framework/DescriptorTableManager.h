@@ -32,12 +32,12 @@ typedef int DescriptorIndex;
 class DescriptorHandle
 {
 private:
-    std::weak_ptr<DescriptorTableManager> m_Manager;
+    eastl::weak_ptr<DescriptorTableManager> m_Manager;
     DescriptorIndex m_DescriptorIndex;
 
 public:
     DescriptorHandle();
-    DescriptorHandle(const std::shared_ptr<DescriptorTableManager>& managerPtr, DescriptorIndex index);
+    DescriptorHandle(const eastl::shared_ptr<DescriptorTableManager>& managerPtr, DescriptorIndex index);
     ~DescriptorHandle();
         
     [[nodiscard]] bool IsValid() const { return m_DescriptorIndex >= 0 && !m_Manager.expired(); }
@@ -55,7 +55,7 @@ public:
     DescriptorHandle& operator=(DescriptorHandle&&) = default;
 };
 
-class DescriptorTableManager : public std::enable_shared_from_this<DescriptorTableManager>
+class DescriptorTableManager : public eastl::enable_shared_from_this<DescriptorTableManager>
 {
 protected:
     // Custom hasher that doesn't look at the binding slot
@@ -90,9 +90,9 @@ protected:
     nvrhi::DeviceHandle m_Device;
     nvrhi::DescriptorTableHandle m_DescriptorTable;
 
-    std::vector<nvrhi::BindingSetItem> m_Descriptors;
-    std::unordered_map<nvrhi::BindingSetItem, DescriptorIndex, BindingSetItemHasher, BindingSetItemsEqual> m_DescriptorIndexMap;
-    std::vector<bool> m_AllocatedDescriptors;
+    eastl::vector<nvrhi::BindingSetItem> m_Descriptors;
+    eastl::unordered_map<nvrhi::BindingSetItem, DescriptorIndex, BindingSetItemHasher, BindingSetItemsEqual> m_DescriptorIndexMap;
+    eastl::vector<bool> m_AllocatedDescriptors;
     int m_SearchStart = 0;
         
 public:

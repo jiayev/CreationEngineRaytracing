@@ -1,6 +1,8 @@
 #ifndef UBYTE4_HLSL
 #define UBYTE4_HLSL
 
+#include "Interop.h"
+
 #define UBYTE_MAX (255.0f)
 #define BYTE_NORM_RCP (1.0f / UBYTE_MAX)
 
@@ -46,5 +48,6 @@ struct ubyte4f {
         );
     } 
 };
+VALIDATE_SIZE(ubyte4f, 4);
 
 #endif

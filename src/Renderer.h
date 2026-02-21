@@ -3,6 +3,7 @@
 #include "Passes/RenderPass.h"
 #include "Util.h"
 #include "CameraData.hlsli"
+#include "Types/RendererParams.h"
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -34,7 +35,7 @@ struct MessageCallback : public nvrhi::IMessageCallback
 class Renderer
 {
 	ID3D12Device5* m_NativeD3D12Device;
-	ID3D11Device* m_NativeD3D11Device;
+	ID3D11Device5* m_NativeD3D11Device;
 
 	nvrhi::DeviceHandle m_NVRHIDevice;
 
@@ -103,8 +104,9 @@ public:
 	void SetLogLevel(spdlog::level::level_enum a_level = spdlog::level::info);
 	spdlog::level::level_enum GetLogLevel();
 
+	void Initialize(RendererParams parameters);
 
-	bool Initialize(ID3D12Device5* d3d12Device, ID3D12CommandQueue* commandQueue, ID3D12CommandQueue* computeCommandQueue, ID3D12CommandQueue* copyCommandQueue);
+	void InitializeRenderPasses();
 
 	void SetResolution(uint2 resolution);
 

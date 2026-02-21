@@ -2,9 +2,9 @@
 #include "Scene.h"
 #include "Renderer.h"
 
-bool Initialize(ID3D12Device5* device, ID3D12CommandQueue* commandQueue, ID3D12CommandQueue* computeCommandQueue, ID3D12CommandQueue* copyCommandQueue)
+bool Initialize(ID3D11Device5* d3d11Device, ID3D12Device5* d3d12Device, ID3D12CommandQueue* commandQueue, ID3D12CommandQueue* computeCommandQueue, ID3D12CommandQueue* copyCommandQueue)
 {
-	return Renderer::GetSingleton()->Initialize(device, commandQueue, computeCommandQueue, copyCommandQueue);
+	return Scene::GetSingleton()->Initialize(RendererParams(d3d11Device, d3d12Device, commandQueue, computeCommandQueue, copyCommandQueue));
 }
 
 void ExecutePasses()

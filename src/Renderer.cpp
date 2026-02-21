@@ -6,15 +6,15 @@
 
 #include "Passes/RaytracingPass.h"
 
-bool Renderer::Initialize(ID3D12Device5* d3d12Device, ID3D12CommandQueue* commandQueue, ID3D12CommandQueue* computeCommandQueue, ID3D12CommandQueue* copyCommandQueue)
+void Renderer::Initialize(RendererParams rendererParams)
 {
 	// NVRHI Device
 	nvrhi::d3d12::DeviceDesc deviceDesc;
 	deviceDesc.errorCB = &MessageCallback::GetInstance();
-	deviceDesc.pDevice = d3d12Device;
-	deviceDesc.pGraphicsCommandQueue = commandQueue;
-	deviceDesc.pComputeCommandQueue = computeCommandQueue;
-	deviceDesc.pCopyCommandQueue = copyCommandQueue;
+	deviceDesc.pDevice = rendererParams.d3d12Device;
+	deviceDesc.pGraphicsCommandQueue = rendererParams.commandQueue;
+	deviceDesc.pComputeCommandQueue = rendererParams.computeCommandQueue;
+	deviceDesc.pCopyCommandQueue = rendererParams.copyCommandQueue;
 	deviceDesc.aftermathEnabled = true;
 
 	m_NVRHIDevice = nvrhi::d3d12::createDevice(deviceDesc);
@@ -25,7 +25,8 @@ bool Renderer::Initialize(ID3D12Device5* d3d12Device, ID3D12CommandQueue* comman
 		m_NVRHIDevice = nvrhiValidationLayer; // make the rest of the application go through the validation layer
 	}
 
-	m_NativeD3D12Device = d3d12Device;
+	m_NativeD3D11Device = rendererParams.d3d11Device;
+	m_NativeD3D12Device = rendererParams.d3d12Device;
 
 	// Initialize Camera Data Buffer
 	{
@@ -35,17 +36,15 @@ bool Renderer::Initialize(ID3D12Device5* d3d12Device, ID3D12CommandQueue* comman
 			sizeof(CameraData), "Frame Data", Constants::MAX_CB_VERSIONS));
 	}
 
-	// Initialize Render Passes
-	{
-		// Temporarily set up a single raytracing pass, more passes will be added later and in a more dynamic way
-		m_RenderPasses.emplace_back(eastl::make_unique<RaytracingPass>(this));
-	}
-
 	m_CommandList = m_NVRHIDevice->createCommandList();
 
 	m_CommandList->open();
+}
 
-	return true;
+void Renderer::InitializeRenderPasses()
+{
+	// Temporarily set up a single raytracing pass, more passes will be added later and in a more dynamic way
+	m_RenderPasses.emplace_back(eastl::make_unique<RaytracingPass>(this));
 }
 
 void Renderer::SetResolution(uint2 resolution)

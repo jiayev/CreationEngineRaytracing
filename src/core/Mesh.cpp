@@ -4,6 +4,9 @@
 
 #include "Scene.h"
 #include "Renderer.h"
+#include "SceneGraph.h"
+
+#include "Material.hlsli"
 
 void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& vertexCountIn, const uint32_t& triangleCountIn, const uint16_t& bonesPerVertex)
 {
@@ -230,12 +233,12 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 	}
 }
 
-void Mesh::BuildMaterial([[maybe_unused]] const RE::BSGeometry::GEOMETRY_RUNTIME_DATA& geometryRuntimeData, [[maybe_unused]] const char* name, [[maybe_unused]] RE::FormID formID)
+void Mesh::BuildMaterial([[maybe_unused]] const RE::BSGeometry::GEOMETRY_RUNTIME_DATA& geometryRuntimeData, [[maybe_unused]] RE::FormID formID)
 {
 
 }
 
-void Mesh::CreateBuffers(nvrhi::ICommandList* commandList, const std::string& name)
+void Mesh::CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandList)
 {
 	auto device = Renderer::GetSingleton()->GetDevice();
 
@@ -245,10 +248,11 @@ void Mesh::CreateBuffers(nvrhi::ICommandList* commandList, const std::string& na
 
 		auto vertexBufferDesc = nvrhi::BufferDesc()
 			.setByteSize(size)
+			.setStructStride(static_cast<uint32_t>(size))
 			.setIsVertexBuffer(true)
 			.enableAutomaticStateTracking(nvrhi::ResourceStates::VertexBuffer)
 			.setIsAccelStructBuildInput(true)
-			.setDebugName(name + " (Vertex Buffer)");
+			.setDebugName(std::format("{} (Vertex Buffer)", m_Name.c_str()));
 
 		buffers.vertexBuffer = device->createBuffer(vertexBufferDesc);
 
@@ -261,15 +265,29 @@ void Mesh::CreateBuffers(nvrhi::ICommandList* commandList, const std::string& na
 
 		auto triangleBufferDesc = nvrhi::BufferDesc()
 			.setByteSize(size)
+			.setStructStride(static_cast<uint32_t>(size))
 			.setIsIndexBuffer(true)
 			.enableAutomaticStateTracking(nvrhi::ResourceStates::IndexBuffer)
 			.setIsAccelStructBuildInput(true)
-			.setDebugName(name + " (Triangle Buffer)");
+			.setDebugName(std::format("{} (Triangle Buffer)", m_Name.c_str()));
 
 		buffers.triangleBuffer = device->createBuffer(triangleBufferDesc);
 
 		commandList->writeBuffer(buffers.triangleBuffer.Get(), geometry.triangles.data(), size);
 	}
+
+	// Create SRV binding for vertices
+	auto vertexBindingSet = nvrhi::BindingSetItem::StructuredBuffer_SRV(0, buffers.vertexBuffer);
+
+	// Register descriptor, get handle with heap and writes the SRV
+	auto& meshDescriptorTable = sceneGraph->GetMeshDescriptors()->m_DescriptorTable;
+	m_DescriptorHandle = meshDescriptorTable->CreateDescriptorHandle(vertexBindingSet);
+
+	// Set triangle to same slot (they have different spaces)
+	auto triangleBindingSet = nvrhi::BindingSetItem::StructuredBuffer_SRV(m_DescriptorHandle.Get(), buffers.triangleBuffer);
+
+	// Write triangle SRV
+	device->writeDescriptorTable(meshDescriptorTable->GetDescriptorTable(), triangleBindingSet);
 
 	// Geometry description
 	auto& geometryTriangles = geometryDesc.geometryData.triangles;
@@ -321,6 +339,16 @@ Mesh::UpdateFlags Mesh::Update()
 	}
 
 	return updateFlags;
+}
+
+MeshData Mesh::GetData() const
+{
+	return MeshData(
+		MaterialData(),
+		static_cast<uint32_t>(m_DescriptorHandle.Get()),
+		{0, 0},
+		localToRoot
+	);
 }
 
 bool Mesh::IsHidden() const

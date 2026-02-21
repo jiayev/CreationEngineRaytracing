@@ -37,6 +37,8 @@ using namespace std::literals;
 
 #include "stl.h"
 
+#include <d3d11_4.h>
+
 #include <directx/d3d12.h>
 
 #include <nvrhi/d3d12.h>

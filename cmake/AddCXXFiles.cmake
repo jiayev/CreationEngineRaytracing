@@ -24,6 +24,10 @@ function(add_cxx_files TARGET)
 		PREFIX "Interop Files"
 		FILES ${INTEROP_FILES})
 
+	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}}
+		PREFIX "Interop Files"
+		FILES ${INTEROP_FILES})
+
 	target_sources("${TARGET}" PUBLIC ${INCLUDE_FILES} ${INTEROP_FILES})
 
 	file(GLOB_RECURSE HEADER_FILES

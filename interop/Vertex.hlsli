@@ -11,7 +11,7 @@ struct Vertex
 	half3 Normal;
 	half3 Bitangent;
 	float Handedness; // Kept as float for padding
-#if defined(BAKED_TEXTURES)	// Probably misaligned
+#if defined(BAKED_TEXTURES)	// Probably misaligned, but no being used atm
 	ubyte4f Albedo;
     u16bytef Roughness;
     u16bytef Metallic;

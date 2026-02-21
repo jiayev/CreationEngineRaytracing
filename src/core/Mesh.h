@@ -11,6 +11,10 @@
 
 #include "Framework/DescriptorTableManager.h"
 
+#include "Mesh.hlsli"
+
+class SceneGraph;
+
 struct Mesh
 {
 	enum class Flags : uint8_t
@@ -36,6 +40,8 @@ struct Mesh
 		Hidden = 1 << 0,
 		DismemberHidden = 1 << 1
 	};
+
+	eastl::string m_Name;
 
 	uint vertexCount = 0;
 	uint triangleCount = 0;
@@ -70,8 +76,10 @@ struct Mesh
 	// DismemberSkinInstance slot
 	uint16_t slot;
 
-	Mesh(Flags flags, RE::BSGeometry* bsGeometryPtr, float3x4 localToRoot, bool dismemberVisible = true, uint16_t slot = 0) :
-		flags(flags), bsGeometryPtr(bsGeometryPtr), localToRoot(localToRoot), slot(slot)
+	DescriptorHandle m_DescriptorHandle;
+
+	Mesh(Flags flags, const char* name, RE::BSGeometry* bsGeometryPtr, float3x4 localToRoot, bool dismemberVisible = true, uint16_t slot = 0) :
+		flags(flags), m_Name(name), bsGeometryPtr(bsGeometryPtr), localToRoot(localToRoot), slot(slot)
 	{
 		UpdateDismember(dismemberVisible);
 	}
@@ -81,9 +89,9 @@ struct Mesh
 
 	void CalculateVectors(bool calculateNormal);
 
-	void BuildMaterial(const RE::BSGeometry::GEOMETRY_RUNTIME_DATA& geometryRuntimeData, const char* name, RE::FormID formID);
+	void BuildMaterial(const RE::BSGeometry::GEOMETRY_RUNTIME_DATA& geometryRuntimeData, RE::FormID formID);
 
-	void CreateBuffers(nvrhi::ICommandList* commandList, const std::string& name);
+	void CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandList);
 
 	bool UpdateDynamicPosition();
 
@@ -97,6 +105,7 @@ struct Mesh
 
 	bool IsDirtyState() const;
 
+	MeshData GetData() const;
 private:
 	// State is pending until BLASRebuild
 	State pendingState = State::None;

@@ -1,28 +1,37 @@
 #include "Scene.h"
 #include "Util.h"
-
 #include "SceneGraph.h"
 
 #include "framework/DescriptorTableManager.h"
+
+#include "Renderer.h"
 
 SceneGraph* Scene::GetSceneGraph() const
 {
 	return m_SceneGraph.get();
 }
 
+bool Scene::Initialize(RendererParams rendererParams) {
+	auto* renderer = Renderer::GetSingleton();
+
+	// Initialize renderer
+	renderer->Initialize(rendererParams);
+
+	if (!renderer->GetDevice())
+		return false;
+
+	// Initialize global descriptors (mesh and texture bindless arrays)
+	m_SceneGraph->Initialize();
+
+	// We split render pass initialization from renderer because of the global descriptors
+	renderer->InitializeRenderPasses();
+
+	return true;
+}
+
 void Scene::Update([[maybe_unused]] nvrhi::ICommandList* commandList)
 {
-	auto sceneGraph = GetSceneGraph();
-
-	for (auto& instance : sceneGraph->GetInstances())
-	{
-		instance->Update();
-	}
-
-	for (auto& [path, model] : sceneGraph->GetModels())
-	{
-		model->Update();
-	}
+	GetSceneGraph()->Update(commandList);
 }
 
 void Scene::AttachModel([[maybe_unused]] RE::TESForm* form) 

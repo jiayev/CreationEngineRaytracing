@@ -3,6 +3,9 @@
 
 #	ifdef __cplusplus
 #		define INTEROP_STRUCT(name, alignment) struct alignas(alignment) name
+#		define INTEROP_DATA_STRUCT(name, alignment) struct alignas(alignment) name##Data
+#		define INTEROP_DATA_TYPE(name) name##Data
+#		define INTEROP_ROW_MAJOR(type) type
 
 // -----------------------------------------------------
 // Core constant buffer validation
@@ -47,6 +50,9 @@
 #	else
 
 #		define INTEROP_STRUCT(name, alignment) struct name
+#		define INTEROP_DATA_STRUCT(name, alignment) struct name
+#		define INTEROP_DATA_TYPE(name) name
+#		define INTEROP_ROW_MAJOR(type) row_major type
 
 #       define VALIDATE_CBUFFER(T, EXPECTED_ALIGNMENT)
 #       define VALIDATE_ALIGNMENT(T, EXPECTED_ALIGNMENT)
