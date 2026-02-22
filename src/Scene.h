@@ -9,6 +9,9 @@ struct Scene
 {
 	eastl::unique_ptr<SceneGraph> m_SceneGraph;
 
+	std::recursive_mutex shareTextureMutex;
+	bool shareTexture = false;
+
 	Scene()
 	{
 		m_SceneGraph = eastl::make_unique<SceneGraph>();

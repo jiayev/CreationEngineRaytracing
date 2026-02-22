@@ -14,9 +14,21 @@ namespace Hooks
 		static void thunk(void* a1, bool a2, bool a3);
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
+
+	struct CreateTextureFromDDS
+	{
+		static RE::NiSourceTexture* thunk(RE::BSResource::CompressedArchiveStream* a1, char* path, ID3D11ShaderResourceView* srv, char a4, bool a5);
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
 #elif defined(FALLOUT4)
 
 #endif
+
+	struct ID3D11Device_CreateTexture2D
+	{
+		static HRESULT WINAPI thunk(ID3D11Device* This, const D3D11_TEXTURE2D_DESC* pDesc, const D3D11_SUBRESOURCE_DATA* pInitialData, ID3D11Texture2D** ppTexture2D);
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
 
 	void Install();
 	void InstallEarlyHooks();

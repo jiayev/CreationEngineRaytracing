@@ -36,13 +36,47 @@ namespace Hooks
 
 		func(a1, a2, a3);
 	}
+
+	RE::NiSourceTexture* CreateTextureFromDDS::thunk(RE::BSResource::CompressedArchiveStream* a1, char* path, ID3D11ShaderResourceView* srv, char a4, bool a5)
+	{
+		auto* scene = Scene::GetSingleton();
+
+		std::lock_guard<std::recursive_mutex> lock(scene->shareTextureMutex);
+
+		scene->shareTexture = true;
+
+		auto* result = func(a1, path, srv, a4, a5);
+
+		scene->shareTexture = false;
+
+		return result;
+	}
 #elif defined(FALLOUT4)
 
 #endif
 
+	HRESULT WINAPI ID3D11Device_CreateTexture2D::thunk(ID3D11Device* This, const D3D11_TEXTURE2D_DESC* pDesc, const D3D11_SUBRESOURCE_DATA* pInitialData, ID3D11Texture2D** ppTexture2D)
+	{
+		if (!pDesc)
+			return func(This, pDesc, pInitialData, ppTexture2D);
+
+		auto* scene = Scene::GetSingleton();
+
+		std::lock_guard<std::recursive_mutex> lock(scene->shareTextureMutex);
+
+		D3D11_TEXTURE2D_DESC descCopy = *pDesc;
+
+		if (scene->shareTexture && !(pDesc->MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE)) {
+			descCopy.MiscFlags |= D3D11_RESOURCE_MISC_SHARED;
+		}
+
+		return func(This, &descCopy, pInitialData, ppTexture2D);
+	}
+
 	void Install()
 	{
 #if defined(SKYRIM)
+		stl::detour_thunk<CreateTextureFromDDS>(REL::RelocationID(69334, 70716));
 		stl::detour_thunk<TES_AttachModel>(REL::RelocationID(13209, 13355));
 		stl::detour_thunk<Main_RenderPlayerView>(REL::RelocationID(35560, 36559));
 #elif defined(FALLOUT4)
@@ -53,6 +87,8 @@ namespace Hooks
 
 	void InstallD3D11Hooks(ID3D11Device* device)
 	{
+		stl::detour_vfunc<5, ID3D11Device_CreateTexture2D>(device);
+
 		logger::info("[Raytracing] Installed D3D11 hooks - [0x{:08X}]", reinterpret_cast<uintptr_t>(device));
 	}
 }
