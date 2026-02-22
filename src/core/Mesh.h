@@ -77,6 +77,7 @@ struct Mesh
 	uint16_t slot;
 
 	DescriptorHandle m_DescriptorHandle;
+	DescriptorHandle m_VertexDescriptorHandle;
 
 	Mesh(Flags flags, const char* name, RE::BSGeometry* bsGeometryPtr, float3x4 localToRoot, bool dismemberVisible = true, uint16_t slot = 0) :
 		flags(flags), m_Name(name), bsGeometryPtr(bsGeometryPtr), localToRoot(localToRoot), slot(slot)

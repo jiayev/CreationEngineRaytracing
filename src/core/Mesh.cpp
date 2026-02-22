@@ -1,6 +1,6 @@
 #include "Mesh.h"
 #include "Util.h"
-#include "ubyte4.hlsli"
+#include "byte4.hlsli"
 
 #include "Scene.h"
 #include "Renderer.h"
@@ -106,15 +106,15 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 			}
 
 			if (hasNormal) {
-				ubyte4f normalPacked;
-				std::memcpy(&normalPacked, vtx + normOffset, sizeof(ubyte4f));
+				byte4f normalPacked;
+				std::memcpy(&normalPacked, vtx + normOffset, sizeof(byte4f));
 				auto normal = normalPacked.unpack();
 
 				vertexData.Normal = Util::Normalize({ normal.x, normal.y, normal.z });
 
 				if (hasBitangent) {
-					ubyte4f bitangentPacked;
-					std::memcpy(&bitangentPacked, vtx + tangOffset, sizeof(ubyte4f));
+					byte4f bitangentPacked;
+					std::memcpy(&bitangentPacked, vtx + tangOffset, sizeof(byte4f));
 					auto bitangent = bitangentPacked.unpack();
 
 					vertexData.Bitangent = Util::Normalize({ bitangent.x, bitangent.y, bitangent.z });
@@ -242,13 +242,15 @@ void Mesh::CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandLis
 {
 	auto device = Renderer::GetSingleton()->GetDevice();
 
+	bool updatable = (flags & Flags::Dynamic) || (flags & Flags::Skinned);
+
 	// Vertex Buffer
 	{
 		const size_t size = sizeof(Vertex) * vertexCount;
 
 		auto vertexBufferDesc = nvrhi::BufferDesc()
 			.setByteSize(size)
-			.setStructStride(static_cast<uint32_t>(size))
+			.setStructStride(sizeof(Vertex))
 			.setIsVertexBuffer(true)
 			.enableAutomaticStateTracking(nvrhi::ResourceStates::VertexBuffer)
 			.setIsAccelStructBuildInput(true)
@@ -265,7 +267,7 @@ void Mesh::CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandLis
 
 		auto triangleBufferDesc = nvrhi::BufferDesc()
 			.setByteSize(size)
-			.setStructStride(static_cast<uint32_t>(size))
+			.setStructStride(sizeof(Triangle))
 			.setIsIndexBuffer(true)
 			.enableAutomaticStateTracking(nvrhi::ResourceStates::IndexBuffer)
 			.setIsAccelStructBuildInput(true)
@@ -276,18 +278,28 @@ void Mesh::CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandLis
 		commandList->writeBuffer(buffers.triangleBuffer.Get(), geometry.triangles.data(), size);
 	}
 
-	// Create SRV binding for vertices
-	auto vertexBindingSet = nvrhi::BindingSetItem::StructuredBuffer_SRV(0, buffers.vertexBuffer);
+	{
+		// Create SRV binding for triangles
+		auto triangleBindingSet = nvrhi::BindingSetItem::StructuredBuffer_SRV(0, buffers.triangleBuffer);
+		// Register descriptor, get handle with heap and writes the SRV
+		m_DescriptorHandle = sceneGraph->GetTriangleDescriptors()->m_DescriptorTable->CreateDescriptorHandle(triangleBindingSet);
+	}
 
-	// Register descriptor, get handle with heap and writes the SRV
-	auto& meshDescriptorTable = sceneGraph->GetMeshDescriptors()->m_DescriptorTable;
-	m_DescriptorHandle = meshDescriptorTable->CreateDescriptorHandle(vertexBindingSet);
+	{
+		// Set vertex to same slot (they have different spaces)
+		auto vertexBindingSet = nvrhi::BindingSetItem::StructuredBuffer_SRV(m_DescriptorHandle.Get(), buffers.vertexBuffer);
 
-	// Set triangle to same slot (they have different spaces)
-	auto triangleBindingSet = nvrhi::BindingSetItem::StructuredBuffer_SRV(m_DescriptorHandle.Get(), buffers.triangleBuffer);
+		// Write vertex SRV
+		device->writeDescriptorTable(sceneGraph->GetVertexDescriptors()->m_DescriptorTable->GetDescriptorTable(), vertexBindingSet);
+		//m_VertexDescriptorHandle = sceneGraph->GetVertexDescriptors()->m_DescriptorTable->CreateDescriptorHandle(vertexBindingSet);
+	}
 
-	// Write triangle SRV
-	device->writeDescriptorTable(meshDescriptorTable->GetDescriptorTable(), triangleBindingSet);
+	// Updatable geometry is already in root space
+	if (updatable)
+		localToRoot = float3x4(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f);
 
 	// Geometry description
 	auto& geometryTriangles = geometryDesc.geometryData.triangles;
@@ -302,6 +314,9 @@ void Mesh::CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandLis
 	geometryTriangles.vertexFormat = nvrhi::Format::RGB32_FLOAT;
 	geometryTriangles.vertexStride = sizeof(Vertex);
 	geometryTriangles.vertexCount = vertexCount;
+
+	if (!updatable)
+		geometryDesc.setTransform(localToRoot.f);
 }
 
 bool Mesh::UpdateDynamicPosition()

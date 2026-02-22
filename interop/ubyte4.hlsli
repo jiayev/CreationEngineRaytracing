@@ -6,7 +6,7 @@
 #define UBYTE_MAX (255.0f)
 #define BYTE_NORM_RCP (1.0f / UBYTE_MAX)
 
-struct u16bytef {
+struct ubyte16f {
     uint16_t x : 8;
  
 #ifdef __cplusplus

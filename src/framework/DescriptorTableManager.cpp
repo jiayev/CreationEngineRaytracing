@@ -57,12 +57,22 @@ DescriptorIndex DescriptorHandle::GetIndexInHeap() const
     return -1;
 }
 
-DescriptorTableManager::DescriptorTableManager(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout)
+DescriptorTableManager::DescriptorTableManager(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout, bool resizeToMaxCapacity)
     : m_Device(device)
 {
     m_DescriptorTable = m_Device->createDescriptorTable(layout);
 
-    size_t capacity = m_DescriptorTable->getCapacity();
+    // Ensure descriptor table is sized to layout desc max capacity
+    auto bindlessDesc = layout->getBindlessDesc();
+
+    auto capacity = m_DescriptorTable->getCapacity();
+
+    if (resizeToMaxCapacity && capacity < bindlessDesc->maxCapacity)
+    {
+        capacity = bindlessDesc->maxCapacity;
+        m_Device->resizeDescriptorTable(m_DescriptorTable, capacity);
+    }
+
     m_AllocatedDescriptors.resize(capacity);
     m_Descriptors.resize(capacity);
     memset(m_Descriptors.data(), 0, sizeof(nvrhi::BindingSetItem) * capacity);

@@ -8,14 +8,6 @@ project(
     LANGUAGES CXX
 )
 
-# default install path
-#if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-#    set_property(
-#        CACHE CMAKE_INSTALL_PREFIX
-#        PROPERTY VALUE "${CMAKE_CURRENT_BINARY_DIR}/aio"
-#    )
-#endif()
-
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 set(DEPLOY_DIR $ENV{DEPLOY_DIR})

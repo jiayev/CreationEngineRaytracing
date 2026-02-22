@@ -8,6 +8,19 @@
 
 #include "Constants.h"
 
+class BindlessLayout : public nvrhi::RefCounter<nvrhi::IBindingLayout>
+{
+public:
+	nvrhi::BindlessLayoutDesc desc;
+	nvrhi::static_vector<D3D12_DESCRIPTOR_RANGE1, 32> descriptorRanges;
+	D3D12_ROOT_PARAMETER1 rootParameter{};
+
+	BindlessLayout(const nvrhi::BindlessLayoutDesc& desc);
+
+	const nvrhi::BindingLayoutDesc* getDesc() const override { return nullptr; }
+	const nvrhi::BindlessLayoutDesc* getBindlessDesc() const override { return &desc; }
+};
+
 class SceneGraph
 {
 	eastl::unordered_map<RE::BSDismemberSkinInstance*, eastl::vector<Mesh*>> dismemberReferences;
@@ -37,11 +50,20 @@ class SceneGraph
 		BindlessTable(nvrhi::DeviceHandle device, nvrhi::BindlessLayoutDesc desc)
 		{
 			m_Layout = device->createBindlessLayout(desc);
-			m_DescriptorTable = eastl::make_shared<DescriptorTableManager>(device, m_Layout);
+
+			/*auto bindingLayout = reinterpret_cast<BindlessLayout*>(m_Layout.Get());
+
+			for (auto& descriptorRange : bindingLayout->descriptorRanges)
+			{
+				descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+			}*/
+
+			m_DescriptorTable = eastl::make_shared<DescriptorTableManager>(device, m_Layout, true);
 		}
 	};
 	
-	eastl::unique_ptr<BindlessTable> m_MeshDescriptors;
+	eastl::unique_ptr<BindlessTable> m_TriangleDescriptors;
+	eastl::unique_ptr<BindlessTable> m_VertexDescriptors;
 	eastl::unique_ptr<BindlessTable> m_TextureDescriptors;
 
 	void CreateModelInternal(RE::TESForm* form, const char* path, RE::NiAVObject* node);
@@ -50,7 +72,8 @@ class SceneGraph
 public:
 	void Initialize();
 
-	inline auto& GetMeshDescriptors() const { return m_MeshDescriptors; }
+	inline auto& GetTriangleDescriptors() const { return m_TriangleDescriptors; }
+	inline auto& GetVertexDescriptors() const { return m_VertexDescriptors; }
 	inline auto& GetTextureDescriptors() const { return m_TextureDescriptors; }
 
 	inline auto& GetMeshDataBuffer() const { return m_MeshDataBuffer; }

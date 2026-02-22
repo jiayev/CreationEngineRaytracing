@@ -44,31 +44,31 @@ inline float4 Interpolate(half4 u, half4 v, half4 w, float3 uvw)
 
 Instance GetInstance(uint instanceIdx)
 {
-    return Instances[instanceIdx];
+    return Instances[NonUniformResourceIndex(instanceIdx)];
 }
 
 Mesh GetMesh(in uint instanceIndex, in uint geometryIndex)
 {
     Instance instance = GetInstance(instanceIndex);
-    return Meshes[instance.FirstGeometryID + geometryIndex];
+    return Meshes[NonUniformResourceIndex(instance.FirstGeometryID + geometryIndex)];
 }
 
 Mesh GetMesh(in Payload payload, out Instance instance)
 {
     instance = GetInstance(payload.InstanceIndex());
-    return Meshes[instance.FirstGeometryID + payload.GeometryIndex()];
+    return Meshes[NonUniformResourceIndex(instance.FirstGeometryID + payload.GeometryIndex())];
 }
 
 Triangle GetTriangle(in uint shapeIdx, in uint primitiveIdx)
 {
-    return Triangles[shapeIdx][primitiveIdx];
+    return Triangles[NonUniformResourceIndex(shapeIdx)][primitiveIdx];
 }
 
 void GetVertices(in uint meshIndex, in uint primitiveIndex, out Vertex v0, out Vertex v1, out Vertex v2)
 {
     Triangle geomTriangle = GetTriangle(meshIndex, primitiveIndex);
 
-    StructuredBuffer<Vertex> vertices = Vertices[meshIndex];
+    StructuredBuffer<Vertex> vertices = Vertices[NonUniformResourceIndex(meshIndex)];
     v0 = vertices[geomTriangle.x];
     v1 = vertices[geomTriangle.y];
     v2 = vertices[geomTriangle.z];

@@ -34,7 +34,7 @@ struct Instance
 		assert(instanceDesc.bottomLevelAS);
 		instanceDesc.instanceMask = 1;
 		instanceDesc.instanceID = 0;
-		memcpy(instanceDesc.transform, transform.m, sizeof(transform.m));
+		memcpy(instanceDesc.transform, transform.m, sizeof(instanceDesc.transform));
 		return instanceDesc;
 	}
 

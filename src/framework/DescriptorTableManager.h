@@ -96,7 +96,7 @@ protected:
     int m_SearchStart = 0;
         
 public:
-    DescriptorTableManager(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout);
+    DescriptorTableManager(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout, bool resizeToMaxCapacity);
     ~DescriptorTableManager();
         
     nvrhi::IDescriptorTable* GetDescriptorTable() const { return m_DescriptorTable; }

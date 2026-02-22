@@ -16,6 +16,7 @@ StructuredBuffer<Instance> Instances    : register(t1);
 StructuredBuffer<Mesh> Meshes           : register(t2);
 
 StructuredBuffer<Triangle> Triangles[]  : register(t0, space1);
+
 StructuredBuffer<Vertex> Vertices[]     : register(t0, space2);
 
 Texture2D<float4> Textures[]            : register(t0, space3);

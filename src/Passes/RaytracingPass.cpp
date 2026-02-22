@@ -53,8 +53,6 @@ bool RaytracingPass::CreateRayTracingPipeline()
 {
 	auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
 
-	nvrhi::rt::PipelineDesc pipelineDesc;
-	pipelineDesc.globalBindingLayouts = { m_BindingLayout, sceneGraph->GetMeshDescriptors()->m_Layout, sceneGraph->GetTextureDescriptors()->m_Layout };
 	eastl::vector<DxcDefine> defines = { { L"USE_RAY_QUERY", L"0" } };
 
 	auto device = GetRenderer()->GetDevice();
@@ -63,6 +61,8 @@ bool RaytracingPass::CreateRayTracingPipeline()
 	auto rayGenLib = ShaderUtils::CompileShaderLibrary(device, L"data/shaders/raytracing/RayGeneration.hlsl", defines);
 	auto missLib = ShaderUtils::CompileShaderLibrary(device, L"data/shaders/raytracing/Miss.hlsl", defines);
 	auto hitLib = ShaderUtils::CompileShaderLibrary(device, L"data/shaders/raytracing/ClosestHit.hlsl", defines);
+
+	nvrhi::rt::PipelineDesc pipelineDesc;
 
 	// Pipeline Shaders
 	pipelineDesc.shaders = {
@@ -79,6 +79,13 @@ bool RaytracingPass::CreateRayTracingPipeline()
 			nullptr,  // binding layout
 			false     // isProceduralPrimitive
 		}
+	};
+
+	pipelineDesc.globalBindingLayouts = {
+		m_BindingLayout,
+		sceneGraph->GetTriangleDescriptors()->m_Layout,
+		sceneGraph->GetVertexDescriptors()->m_Layout,
+		sceneGraph->GetTextureDescriptors()->m_Layout
 	};
 
 	pipelineDesc.maxPayloadSize = 20;
@@ -117,7 +124,8 @@ bool RaytracingPass::CreateComputePipeline()
 	auto pipelineDesc = nvrhi::ComputePipelineDesc()
 		.setComputeShader(m_ComputeShader)
 		.addBindingLayout(m_BindingLayout)
-		.addBindingLayout(sceneGraph->GetMeshDescriptors()->m_Layout)
+		.addBindingLayout(sceneGraph->GetTriangleDescriptors()->m_Layout)
+		.addBindingLayout(sceneGraph->GetVertexDescriptors()->m_Layout)
 		.addBindingLayout(sceneGraph->GetTextureDescriptors()->m_Layout);
 
 	m_ComputePipeline = GetRenderer()->GetDevice()->createComputePipeline(pipelineDesc);
@@ -183,7 +191,7 @@ void RaytracingPass::CheckBindings()
 		nvrhi::BindingSetItem::ConstantBuffer(0, renderer->GetCameraDataBuffer()),
 		nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_TopLevelAS),
 		nvrhi::BindingSetItem::StructuredBuffer_SRV(1, sceneGraph->GetInstanceDataBuffer()),
-		nvrhi::BindingSetItem::StructuredBuffer_SRV(2,sceneGraph->GetMeshDataBuffer()),
+		nvrhi::BindingSetItem::StructuredBuffer_SRV(2, sceneGraph->GetMeshDataBuffer()),
 		nvrhi::BindingSetItem::Sampler(0, m_LinearWrapSampler),
 		nvrhi::BindingSetItem::Texture_UAV(0, renderer->GetMainTexture())
 	};
@@ -201,9 +209,12 @@ void RaytracingPass::Execute(nvrhi::ICommandList* commandList)
 
 	auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
 
+	//auto descriptorTable = reinterpret_cast<nvrhi::d3d12::DescriptorTable*>(sceneGraph->GetTriangleDescriptors()->m_DescriptorTable->GetDescriptorTable());
+
 	nvrhi::BindingSetVector bindings = { 
 		m_BindingSet, 
-		sceneGraph->GetMeshDescriptors()->m_DescriptorTable->GetDescriptorTable(),
+		sceneGraph->GetTriangleDescriptors()->m_DescriptorTable->GetDescriptorTable(),
+		sceneGraph->GetVertexDescriptors()->m_DescriptorTable->GetDescriptorTable(),
 		sceneGraph->GetTextureDescriptors()->m_DescriptorTable->GetDescriptorTable() 
 	};
 
