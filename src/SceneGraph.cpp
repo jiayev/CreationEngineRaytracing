@@ -25,7 +25,7 @@ void SceneGraph::Initialize()
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1).setSize(UINT_MAX)
 		};
 
-		m_TriangleDescriptors = eastl::make_unique<BindlessTable>(device, bindlessLayoutDesc);
+		m_TriangleDescriptors = eastl::make_unique<BindlessTable>(device, bindlessLayoutDesc, true);
 	}
 
 	// Vertex bindless descriptor table
@@ -38,7 +38,7 @@ void SceneGraph::Initialize()
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2).setSize(UINT_MAX)
 		};
 
-		m_VertexDescriptors = eastl::make_unique<BindlessTable>(device, bindlessLayoutDesc);;
+		m_VertexDescriptors = eastl::make_unique<BindlessTable>(device, bindlessLayoutDesc, true);
 	}
 
 	// Texture bindless descriptor table
@@ -51,7 +51,7 @@ void SceneGraph::Initialize()
 			nvrhi::BindingLayoutItem::Texture_SRV(3).setSize(UINT_MAX)
 		};
 
-		m_TextureDescriptors = eastl::make_unique<BindlessTable>(device, bindlessLayoutDesc);
+		m_TextureDescriptors = eastl::make_unique<BindlessTable>(device, bindlessLayoutDesc, true);
 	}
 }
 

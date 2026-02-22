@@ -47,7 +47,7 @@ class SceneGraph
 		nvrhi::BindingLayoutHandle m_Layout;
 		eastl::shared_ptr<DescriptorTableManager> m_DescriptorTable;
 
-		BindlessTable(nvrhi::DeviceHandle device, nvrhi::BindlessLayoutDesc desc)
+		BindlessTable(nvrhi::DeviceHandle device, nvrhi::BindlessLayoutDesc desc, bool resizeToMaxCapacity)
 		{
 			m_Layout = device->createBindlessLayout(desc);
 
@@ -58,7 +58,7 @@ class SceneGraph
 				descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 			}*/
 
-			m_DescriptorTable = eastl::make_shared<DescriptorTableManager>(device, m_Layout, true);
+			m_DescriptorTable = eastl::make_shared<DescriptorTableManager>(device, m_Layout, resizeToMaxCapacity);
 		}
 	};
 	
