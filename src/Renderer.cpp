@@ -35,7 +35,71 @@ void Renderer::Initialize(RendererParams rendererParams)
 		m_CameraData = eastl::make_unique<CameraData>();
 
 		m_CameraDataBuffer = m_NVRHIDevice->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
-			sizeof(CameraData), "Frame Data", Constants::MAX_CB_VERSIONS));
+			sizeof(CameraData), "Camera Data", Constants::MAX_CB_VERSIONS));
+	}
+
+	// Initialize default textures
+	{
+		uint8_t white[] = { 255u, 255u, 255u, 255u };
+		uint8_t gray[] = { 128u, 128u, 128u, 255u };
+		uint8_t normal[] = { 128u, 128u, 255u, 255u };
+		uint8_t black[] = { 0u, 0u, 0u, 0u };
+		uint8_t rmaos[] = { 128u, 0u, 255u, 255u };
+		uint8_t detail[] = { 63u, 64u, 63u, 255u };
+
+		nvrhi::TextureDesc desc;
+		desc.width = 1;
+		desc.height = 1;
+		desc.mipLevels = 1;
+		desc.format = nvrhi::Format::RGBA8_UNORM;
+
+		desc.debugName = "Default White Texture";
+		m_WhiteTexture = m_NVRHIDevice->createTexture(desc);
+
+		desc.debugName = "Default Gray Texture";
+		m_GrayTexture = m_NVRHIDevice->createTexture(desc);
+
+		desc.debugName = "Default Normal Texture";
+		m_NormalTexture = m_NVRHIDevice->createTexture(desc);
+
+		desc.debugName = "Default Black Texture";
+		m_BlackTexture = m_NVRHIDevice->createTexture(desc);
+
+		desc.debugName = "Default RMAOS Texture";
+		m_RMAOSTexture = m_NVRHIDevice->createTexture(desc);
+
+		desc.debugName = "Default Detail Texture";
+		m_DetailTexture = m_NVRHIDevice->createTexture(desc);
+
+		// Write the textures using a temporary CL
+		nvrhi::CommandListHandle commandList = m_NVRHIDevice->createCommandList();
+		commandList->open();
+
+		commandList->beginTrackingTextureState(m_WhiteTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+		commandList->beginTrackingTextureState(m_GrayTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+		commandList->beginTrackingTextureState(m_NormalTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+		commandList->beginTrackingTextureState(m_BlackTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+		commandList->beginTrackingTextureState(m_RMAOSTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+		commandList->beginTrackingTextureState(m_DetailTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+
+		commandList->writeTexture(m_WhiteTexture, 0, 0, &white, 0);
+		commandList->writeTexture(m_GrayTexture, 0, 0, &gray, 0);
+		commandList->writeTexture(m_NormalTexture, 0, 0, &normal, 0);
+		commandList->writeTexture(m_BlackTexture, 0, 0, &black, 0);
+		commandList->writeTexture(m_RMAOSTexture, 0, 0, &rmaos, 0);
+		commandList->writeTexture(m_DetailTexture, 0, 0, &detail, 0);
+
+		commandList->setPermanentTextureState(m_WhiteTexture, nvrhi::ResourceStates::ShaderResource);
+		commandList->setPermanentTextureState(m_GrayTexture, nvrhi::ResourceStates::ShaderResource);
+		commandList->setPermanentTextureState(m_NormalTexture, nvrhi::ResourceStates::ShaderResource);
+		commandList->setPermanentTextureState(m_BlackTexture, nvrhi::ResourceStates::ShaderResource);
+		commandList->setPermanentTextureState(m_RMAOSTexture, nvrhi::ResourceStates::ShaderResource);
+		commandList->setPermanentTextureState(m_DetailTexture, nvrhi::ResourceStates::ShaderResource);
+
+		commandList->commitBarriers();
+
+		commandList->close();
+		m_NVRHIDevice->executeCommandList(commandList);
 	}
 
 	m_CommandList = m_NVRHIDevice->createCommandList();

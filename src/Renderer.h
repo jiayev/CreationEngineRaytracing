@@ -58,6 +58,15 @@ class Renderer
 
 	eastl::vector<eastl::unique_ptr<RenderPass>> m_RenderPasses;
 
+	nvrhi::TextureHandle m_WhiteTexture;
+	nvrhi::TextureHandle m_GrayTexture;
+	nvrhi::TextureHandle m_NormalTexture;
+	nvrhi::TextureHandle m_BlackTexture;
+#if defined(SKYRIM)
+	nvrhi::TextureHandle m_RMAOSTexture;
+	nvrhi::TextureHandle m_DetailTexture;
+#endif
+
 	spdlog::level::level_enum logLevel = spdlog::level::info;
 
 public:

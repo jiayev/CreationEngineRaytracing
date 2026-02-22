@@ -5,14 +5,14 @@
 
 namespace Hooks
 {
-#if defined(SKYRIM)
-	void TES_AttachModel::thunk(RE::TES* tes, RE::TESObjectREFR* refr, RE::TESObjectCELL* cell, void* queuedTree, char a5, RE::NiNode* a6)
+	void TES_AttachModel::thunk(RE::TES* tes, RE::TESObjectREFR* refr, RE::TESObjectCELL* cell, void* queuedTree, bool a5, RE::NiAVObject* a6)
 	{
 		func(tes, refr, cell, queuedTree, a5, a6);
 
 		Scene::GetSingleton()->AttachModel(refr);
 	}
 
+#if defined(SKYRIM)
 	void Main_RenderPlayerView::thunk(void* a1, bool a2, bool a3)
 	{
 		auto* renderer = Renderer::GetSingleton();
@@ -76,11 +76,13 @@ namespace Hooks
 	void Install()
 	{
 #if defined(SKYRIM)
-		stl::detour_thunk<CreateTextureFromDDS>(REL::RelocationID(69334, 70716));
 		stl::detour_thunk<TES_AttachModel>(REL::RelocationID(13209, 13355));
+		stl::detour_thunk<CreateTextureFromDDS>(REL::RelocationID(69334, 70716));
 		stl::detour_thunk<Main_RenderPlayerView>(REL::RelocationID(35560, 36559));
 #elif defined(FALLOUT4)
-
+#	if defined(FALLOUT_POST_NG)
+		stl::detour_thunk<TES_AttachModel>(REL::ID(2192085));
+#	endif
 #endif
 		logger::info("[Raytracing] Installed hooks");
 	}
@@ -89,6 +91,6 @@ namespace Hooks
 	{
 		stl::detour_vfunc<5, ID3D11Device_CreateTexture2D>(device);
 
-		logger::info("[Raytracing] Installed D3D11 hooks - [0x{:08X}]", reinterpret_cast<uintptr_t>(device));
+		logger::info("[Raytracing] Installed D3D11 hooks");
 	}
 }

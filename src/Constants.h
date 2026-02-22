@@ -9,13 +9,13 @@ namespace Constants
 	static constexpr uint32_t MATERIAL_NORMALMAP_ID = 1;
 
 	static constexpr uint32_t NUM_MESHES_MIN = 1024;
-	static constexpr uint32_t NUM_MESHES_MAX = 8096;
+	static constexpr uint32_t NUM_MESHES_MAX = 8 * 1024;
 
 	static constexpr uint32_t NUM_INSTANCES_MIN = 1024;
 	static constexpr uint32_t NUM_INSTANCES_THRESHOLD = 256;
 	static constexpr uint32_t NUM_INSTANCES_STEP = 512;
-	static constexpr uint32_t NUM_INSTANCES_MAX = 8096;
+	static constexpr uint32_t NUM_INSTANCES_MAX = 8 * 1024;
 
 	static constexpr uint32_t NUM_TEXTURES_MIN = 512;
-	static constexpr uint32_t NUM_TEXTURES_MAX = 8096;
+	static constexpr uint32_t NUM_TEXTURES_MAX = 8 * 1024;
 }

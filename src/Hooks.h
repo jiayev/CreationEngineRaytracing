@@ -2,13 +2,13 @@
 
 namespace Hooks
 {
-#if defined(SKYRIM)
 	struct TES_AttachModel
 	{
-		static void thunk(RE::TES* a1, RE::TESObjectREFR* refr, RE::TESObjectCELL* cell, void* queuedTree, char a5, RE::NiNode* a6);
+		static void thunk(RE::TES* a1, RE::TESObjectREFR* refr, RE::TESObjectCELL* cell, void* queuedTree, bool a5, RE::NiAVObject* a6);
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
 
+#if defined(SKYRIM)
 	struct Main_RenderPlayerView
 	{
 		static void thunk(void* a1, bool a2, bool a3);
