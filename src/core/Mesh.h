@@ -61,8 +61,8 @@ struct Mesh
 	{
 		nvrhi::BufferHandle vertexBuffer;
 		nvrhi::BufferHandle triangleBuffer;
-		std::shared_ptr<DescriptorHandle> vertexBufferDescriptor;
-		std::shared_ptr<DescriptorHandle> triangleBufferDescriptor;
+		DescriptorHandle vertexBufferDescriptor;
+		DescriptorHandle triangleBufferDescriptor;
 	} buffers;
 
 	nvrhi::rt::GeometryDesc geometryDesc;
@@ -89,6 +89,8 @@ struct Mesh
 	void BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& vertexCountIn, const uint32_t& triangleCountIn, const uint16_t& bonesPerVertex);
 
 	void CalculateVectors(bool calculateNormal);
+
+	Texture GetTexture(const RE::NiPointer<RE::NiSourceTexture> niPointer, eastl::shared_ptr<DescriptorHandle> defaultDescHandle, bool modelSpaceNormalMap);
 
 	void BuildMaterial(const RE::BSGeometry::GEOMETRY_RUNTIME_DATA& geometryRuntimeData, RE::FormID formID);
 

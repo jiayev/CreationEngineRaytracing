@@ -4,6 +4,7 @@
 #include "Util.h"
 #include "CameraData.hlsli"
 #include "Types/RendererParams.h"
+#include "Types/TextureReference.h"
 
 struct MessageCallback : public nvrhi::IMessageCallback
 {
@@ -58,14 +59,16 @@ class Renderer
 
 	eastl::vector<eastl::unique_ptr<RenderPass>> m_RenderPasses;
 
-	nvrhi::TextureHandle m_WhiteTexture;
-	nvrhi::TextureHandle m_GrayTexture;
-	nvrhi::TextureHandle m_NormalTexture;
-	nvrhi::TextureHandle m_BlackTexture;
+	eastl::unique_ptr<TextureReference> m_WhiteTexture;
+	eastl::unique_ptr<TextureReference> m_GrayTexture;
+	eastl::unique_ptr<TextureReference> m_NormalTexture;
+	eastl::unique_ptr<TextureReference> m_BlackTexture;
 #if defined(SKYRIM)
-	nvrhi::TextureHandle m_RMAOSTexture;
-	nvrhi::TextureHandle m_DetailTexture;
+	eastl::unique_ptr<TextureReference> m_RMAOSTexture;
+	eastl::unique_ptr<TextureReference> m_DetailTexture;
 #endif
+
+	inline static eastl::unordered_map<DXGI_FORMAT, nvrhi::Format> m_FormatMapping;
 
 	spdlog::level::level_enum logLevel = spdlog::level::info;
 
@@ -73,7 +76,7 @@ public:
 
 	struct Settings
 	{
-		bool UseRayQuery = true;
+		bool UseRayQuery = false;
 		bool ValidationLayer = true;
 		bool VariableUpdateRate = false;
 	} settings;
@@ -98,6 +101,15 @@ public:
 
 	inline auto GetCameraData() const { return m_CameraData.get(); }
 
+	inline auto& GetWhiteTextureIndex() const { return m_WhiteTexture->descriptorHandle; }
+	inline auto& GetGrayTextureIndex() const { return m_GrayTexture->descriptorHandle; }
+	inline auto& GetNormalTextureIndex() const { return m_NormalTexture->descriptorHandle; }
+	inline auto& GetBlackTextureIndex() const { return m_BlackTexture->descriptorHandle; }
+	inline auto& GetRMAOSTextureIndex() const { return m_RMAOSTexture->descriptorHandle; }
+	inline auto& GetDetailTextureIndex() const { return m_DetailTexture->descriptorHandle; }
+
+	static inline auto& GetFormatMapping() { return m_FormatMapping; }
+	
 	static uint GetUpdateInterval(float distance)
 	{
 		float t = std::log2((distance - 25.0f) + 1.0f) * 0.3f;
@@ -115,7 +127,9 @@ public:
 
 	void Initialize(RendererParams parameters);
 
-	void InitializeRenderPasses();
+	void InitDefaultTextures();
+
+	void InitRenderPasses();
 
 	void SetResolution(uint2 resolution);
 

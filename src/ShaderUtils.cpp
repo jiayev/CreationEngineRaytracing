@@ -57,8 +57,9 @@ namespace ShaderUtils
 			L"-T", Target,
 			L"-I", L"Data/shaders",
 			L"-Zi",
-			L"-Qstrip_reflect",
-			L"-O3",
+			L"-Zss",
+			L"-Qembed_debug",
+			L"-O3"
 		};
 
 		winrt::com_ptr<IDxcCompilerArgs> compilerArgs;

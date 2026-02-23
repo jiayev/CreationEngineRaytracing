@@ -53,6 +53,8 @@ void SceneGraph::Initialize()
 
 		m_TextureDescriptors = eastl::make_unique<BindlessTable>(device, bindlessLayoutDesc, true);
 	}
+
+
 }
 
 void SceneGraph::Update(nvrhi::ICommandList* commandList)
@@ -176,6 +178,93 @@ void SceneGraph::CreateLandModel(RE::TESObjectLAND* land)
 
 		CreateModelInternal(land, std::format("Landscape_{}_{}_Quad_{}", exteriorData->cellX, exteriorData->cellY, i).c_str(), mesh);
 	}
+}
+
+eastl::shared_ptr<DescriptorHandle> SceneGraph::GetTextureDescriptor(ID3D11Texture2D* d3d11Texture)
+{
+	if (!d3d11Texture)
+		return nullptr;
+
+	if (auto refIt = textures.find(d3d11Texture); refIt != textures.end())
+		return refIt->second->descriptorHandle;
+
+	winrt::com_ptr<IDXGIResource> dxgiResource;
+	HRESULT hr = d3d11Texture->QueryInterface(IID_PPV_ARGS(dxgiResource.put()));
+
+	if (FAILED(hr)) {
+		logger::error("[RT] GetTextureRegister - Failed to query interface.");
+		return nullptr;
+	}
+
+	HANDLE sharedHandle = nullptr;
+	hr = dxgiResource->GetSharedHandle(&sharedHandle);
+
+	if (FAILED(hr) || !sharedHandle) {
+		D3D11_TEXTURE2D_DESC desc;
+		d3d11Texture->GetDesc(&desc);
+
+		logger::debug("[RT] GetTextureRegister - Failed to get shared handle - [{}, {}] Format: {}", desc.Width, desc.Height, magic_enum::enum_name(desc.Format));
+		return nullptr;
+	}
+
+	auto* d3d12Device = Renderer::GetSingleton()->GetNativeD3D12Device();
+
+	auto device = Renderer::GetSingleton()->GetDevice();
+
+	winrt::com_ptr<ID3D12Resource> d3d12Texture;
+	hr = d3d12Device->OpenSharedHandle(sharedHandle, IID_PPV_ARGS(d3d12Texture.put()));
+
+	CloseHandle(sharedHandle);
+
+	if (FAILED(hr)) {
+		logger::error("[RT] GetTextureRegister - Failed to open shared handle.");
+		return nullptr;
+	}
+
+	if (!d3d12Texture) {
+		logger::error("[RT] GetTextureRegister - Failed to adquire DX12 texture.");
+		return nullptr;
+	}
+
+	D3D12_RESOURCE_DESC nativeTexDesc = d3d12Texture->GetDesc();
+
+	auto formatIt = Renderer::GetFormatMapping().find(nativeTexDesc.Format);
+
+	if (formatIt == Renderer::GetFormatMapping().end()) {
+		logger::error("[RT] GetTextureRegister - Unmapped format {}", magic_enum::enum_name(nativeTexDesc.Format));
+		return nullptr;
+	}
+
+	auto textureDesc = nvrhi::TextureDesc()
+		.setWidth(static_cast<uint32_t>(nativeTexDesc.Width))
+		.setHeight(nativeTexDesc.Height)
+		.setFormat(formatIt->second)
+		.setInitialState(nvrhi::ResourceStates::ShaderResource)
+		.setDebugName("Shared Texture [?]");
+
+	auto textureHandle = device->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D12_Resource, d3d12Texture.get(), textureDesc);
+
+	auto [it, emplaced] = textures.try_emplace(d3d11Texture, nullptr);
+
+	if (emplaced) {
+		it->second = eastl::make_unique<TextureReference>(textureHandle, m_TextureDescriptors->m_DescriptorTable.get());
+
+		auto& descriptorHandle = it->second->descriptorHandle;
+
+		//textureHandle->getDesc().debugName = std::format("Shared Texture [{}]", descriptorHandle->Get());
+
+		return descriptorHandle;
+	}
+	else {
+		logger::error("[RT] GetTextureRegister - TextureReference emplace failed.");
+	}
+
+	return nullptr;
+}
+
+eastl::shared_ptr<DescriptorHandle> SceneGraph::GetMSNormalMapDescriptor([[maybe_unused]] Mesh* mesh, [[maybe_unused]] RE::BSGraphics::Texture* texture)
+{
+	return nullptr;
 }
 
 void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::NiAVObject* pRoot)

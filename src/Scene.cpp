@@ -23,8 +23,10 @@ bool Scene::Initialize(RendererParams rendererParams) {
 	// Initialize global descriptors (mesh and texture bindless arrays)
 	m_SceneGraph->Initialize();
 
+	renderer->InitDefaultTextures();
+
 	// We split render pass initialization from renderer because of the global descriptors
-	renderer->InitializeRenderPasses();
+	renderer->InitRenderPasses();
 
 	return true;
 }

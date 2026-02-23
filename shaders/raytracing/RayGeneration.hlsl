@@ -71,14 +71,21 @@ void Main()
         Instance instance;
         Mesh mesh = GetMesh(payload, instance);
         
+        Material material = mesh.Material;
+        
         Vertex v0, v1, v2;
         GetVertices(mesh.GeometryIdx, payload.primitiveIndex, v0, v1, v2);       
+        
+        float2 texCoord0 = material.TexCoord(Interpolate(v0.Texcoord0, v1.Texcoord0, v2.Texcoord0, uvw));
         
         float3x3 objectToWorld3x3 = mul((float3x3) instance.Transform, (float3x3) mesh.Transform);
         
         float3 normalWS = normalize(mul(objectToWorld3x3, Interpolate(v0.Normal, v1.Normal, v2.Normal, uvw)));
         
-        color = normalWS * 0.5f + 0.5f;
+        Texture2D baseTexture = Textures[NonUniformResourceIndex(material.BaseTexture())];
+        float3 albedo = baseTexture.SampleLevel(DefaultSmapler, texCoord0, 0).rgb;
+        
+        color = albedo;
     }
     
     Output[idx] = float4(color, 1.0f);

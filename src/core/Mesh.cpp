@@ -6,7 +6,8 @@
 #include "Renderer.h"
 #include "SceneGraph.h"
 
-#include "Material.hlsli"
+#include "Types\CommunityShaders\BSLightingShaderMaterialPBR.h"
+#include "Types\CommunityShaders\BSLightingShaderMaterialPBRLandscape.h"
 
 void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& vertexCountIn, const uint32_t& triangleCountIn, const uint16_t& bonesPerVertex)
 {
@@ -233,9 +234,294 @@ void Mesh::BuildMesh(RE::BSGraphics::TriShape* rendererData, const uint32_t& ver
 	}
 }
 
+Texture Mesh::GetTexture(const RE::NiPointer<RE::NiSourceTexture> niPointer, eastl::shared_ptr<DescriptorHandle> defaultDescHandle, bool modelSpaceNormalMap = false)
+{
+	if (!niPointer || !niPointer->rendererTexture)
+		return Texture(defaultDescHandle, nullptr);
+
+	eastl::shared_ptr<DescriptorHandle> result = nullptr;
+
+	auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
+
+	if (modelSpaceNormalMap)
+		result = sceneGraph->GetMSNormalMapDescriptor(this, niPointer->rendererTexture);
+	else
+		result = sceneGraph->GetTextureDescriptor(reinterpret_cast<ID3D11Texture2D*>(niPointer->rendererTexture->texture));
+
+	if (!result)
+		return Texture(defaultDescHandle, nullptr);
+
+	return Texture(result, defaultDescHandle.get());
+}
+
 void Mesh::BuildMaterial([[maybe_unused]] const RE::BSGeometry::GEOMETRY_RUNTIME_DATA& geometryRuntimeData, [[maybe_unused]] RE::FormID formID)
 {
+	auto* renderer = Renderer::GetSingleton();
 
+	auto& grayTexture = renderer->GetGrayTextureIndex();
+	auto& normalTexture = renderer->GetNormalTextureIndex();
+	auto& blackTexture = renderer->GetBlackTextureIndex();
+	auto& rmaosTexture = renderer->GetRMAOSTextureIndex();
+	auto& detailTexture = renderer->GetDetailTextureIndex();
+
+	using State = RE::BSGeometry::States;
+	using Feature = RE::BSShaderMaterial::Feature;
+	using EShaderPropertyFlag = RE::BSShaderProperty::EShaderPropertyFlag;
+
+	eastl::array<half4, 3> colors = {
+		float4(1.0f, 1.0f, 1.0f, 1.0f),
+		float4(0.0f, 0.0f, 0.0f, 0.0f),
+		float4(1.0f, 1.0f, 1.0f, 1.0f)
+	};
+
+	eastl::array<half, 3> scalars;
+	scalars.fill(0.0f);
+
+	eastl::array<half4, 2> texCoordOffsetScales = {
+		float4(0.0f, 0.0f, 1.0f, 1.0f),
+		float4(0.0f, 0.0f, 1.0f, 1.0f)
+	};
+
+	Material::AlphaMode alphaFlags = Material::AlphaMode::None;
+	
+	eastl::array<Texture, 20> textures;
+	textures.fill(Texture(blackTexture, nullptr));
+
+	RE::BSShader::Type shaderType = RE::BSShader::Type::None;
+	REX::EnumSet<EShaderPropertyFlag, std::uint64_t> shaderFlags;
+	RE::BSShaderMaterial::Feature feature = RE::BSShaderMaterial::Feature::kNone;
+	stl::enumeration<PBRShaderFlags, uint32_t> pbrFlags;
+
+	{
+		auto* property = geometryRuntimeData.properties[State::kProperty].get();
+
+		auto* effect = geometryRuntimeData.properties[State::kEffect].get();
+
+		if (effect) {
+			if (RE::BSShaderProperty* shaderProp = netimmerse_cast<RE::BSShaderProperty*>(effect)) {
+				shaderFlags = shaderProp->flags.get();
+				colors[0].w *= shaderProp->alpha;
+			}
+
+			if (RE::BSLightingShaderProperty* lightingShaderProp = skyrim_cast<RE::BSLightingShaderProperty*>(effect)) {
+				shaderType = RE::BSShader::Type::Lighting;
+
+				// Set alpha flags
+				if (property && property->GetType() == RE::NiProperty::Type::kAlpha) {
+					static REL::Relocation<const RE::NiRTTI*> niAlphaPropertyRTTI{ RE::NiAlphaProperty::Ni_RTTI };
+					auto alphaProperty = property->GetRTTI() == niAlphaPropertyRTTI.get() ? reinterpret_cast<RE::NiAlphaProperty*>(property) : nullptr;
+
+					if (alphaProperty && alphaProperty->GetAlphaBlending()) {
+						alphaFlags = Material::AlphaMode::Blend;
+					}
+					else if (alphaProperty && alphaProperty->GetAlphaTesting()) {
+						alphaFlags = Material::AlphaMode::Test;
+
+						float alphaScale = (alphaProperty->alphaThreshold / 255.0f) / 0.5f;
+						colors[0].w /= alphaScale;
+					}
+				}
+
+				colors[1] = {
+					lightingShaderProp->emissiveColor->red,
+					lightingShaderProp->emissiveColor->green,
+					lightingShaderProp->emissiveColor->blue,
+					lightingShaderProp->emissiveMult
+				};
+
+				if (auto shaderMaterial = lightingShaderProp->material) {
+					feature = shaderMaterial->GetFeature();
+
+					for (size_t i = 0; i < 2; i++) {
+						texCoordOffsetScales[i] = {
+							shaderMaterial->texCoordOffset[i].x, shaderMaterial->texCoordOffset[i].y,
+							shaderMaterial->texCoordScale[i].x, shaderMaterial->texCoordScale[i].y
+						};
+					}
+
+					// Landscape
+					if (const auto* lightingBaseMaterialLand = skyrim_cast<RE::BSLightingShaderMaterialLandscape*>(shaderMaterial)) {
+						textures[0] = GetTexture(lightingBaseMaterialLand->diffuseTexture, grayTexture);
+						textures[Material::MAX_PBRLAND_TEXTURES] = GetTexture(lightingBaseMaterialLand->normalTexture, normalTexture);
+
+						for (uint i = 0; i < std::min(lightingBaseMaterialLand->numLandscapeTextures, Material::MAX_LAND_TEXTURES); i++) {
+							textures[i + 1] = GetTexture(lightingBaseMaterialLand->landscapeDiffuseTexture[i], grayTexture);
+							textures[Material::MAX_PBRLAND_TEXTURES + i + 1] = GetTexture(lightingBaseMaterialLand->landscapeNormalTexture[i], normalTexture);
+						}
+
+						textures[Material::MAX_PBRLAND_TEXTURES * 3] = GetTexture(lightingBaseMaterialLand->terrainOverlayTexture, blackTexture);
+						textures[Material::MAX_PBRLAND_TEXTURES * 3 + 1] = GetTexture(lightingBaseMaterialLand->terrainNoiseTexture, blackTexture);
+					}
+					else if (typeid(*shaderMaterial) == typeid(BSLightingShaderMaterialPBRLandscape)) {
+						const auto* lightingPBRMaterialLand = static_cast<BSLightingShaderMaterialPBRLandscape*>(shaderMaterial);
+
+						for (uint i = 0; i < std::min(lightingPBRMaterialLand->numLandscapeTextures, Material::MAX_PBRLAND_TEXTURES); i++) {
+							textures[i] = GetTexture(lightingPBRMaterialLand->landscapeBaseColorTextures[i], grayTexture);
+							textures[Material::MAX_PBRLAND_TEXTURES + i] = GetTexture(lightingPBRMaterialLand->landscapeNormalTextures[i], normalTexture);
+							textures[Material::MAX_PBRLAND_TEXTURES * 2 + i] = GetTexture(lightingPBRMaterialLand->landscapeRMAOSTextures[i], rmaosTexture);
+						}
+
+						textures[Material::MAX_PBRLAND_TEXTURES * 3] = GetTexture(lightingPBRMaterialLand->terrainOverlayTexture, blackTexture);
+						textures[Material::MAX_PBRLAND_TEXTURES * 3 + 1] = GetTexture(lightingPBRMaterialLand->terrainNoiseTexture, blackTexture);
+					}
+					else if (typeid(*shaderMaterial) == typeid(BSLightingShaderMaterialPBR)) {
+						// TrueBR - Tried to check for 'lightingShaderProp->flags.any(EShaderPropertyFlag::kMenuScreen)'
+						// but it did not work at all, skyrim_cast is not safe and will cast even if not PBR material (no RTTI?)
+
+						const auto* lightingPBRMaterial = static_cast<BSLightingShaderMaterialPBR*>(shaderMaterial);
+
+						textures[0] = GetTexture(lightingPBRMaterial->diffuseTexture, grayTexture);
+						textures[Constants::MATERIAL_NORMALMAP_ID] = GetTexture(lightingPBRMaterial->normalTexture, normalTexture);
+						textures[2] = GetTexture(lightingPBRMaterial->emissiveTexture, blackTexture);
+						textures[3] = GetTexture(lightingPBRMaterial->rmaosTexture, rmaosTexture);
+
+						scalars[0] = lightingPBRMaterial->GetRoughnessScale();
+						scalars[1] = lightingPBRMaterial->GetSpecularLevel();
+
+						pbrFlags = Util::Material::GetPBRShaderFlags(lightingPBRMaterial);
+
+						if (pbrFlags & PBRShaderFlags::Subsurface) {
+							textures[6] = GetTexture(lightingPBRMaterial->featuresTexture0, blackTexture);
+
+							auto sssColor = lightingPBRMaterial->GetSubsurfaceColor();
+							colors[2] = { sssColor.red, sssColor.green, sssColor.blue, 1.0f };
+							scalars[2] = lightingPBRMaterial->GetSubsurfaceOpacity();
+						}
+
+						// Enforce TruePBR flag
+						shaderFlags.set(EShaderPropertyFlag::kMenuScreen);
+					}
+					else {
+						// Roughness Scale
+						scalars[0] = 1.0f;
+
+						// Specular Level
+						scalars[1] = 0.04f;
+
+						// Vanilla Materials
+						if (const RE::BSLightingShaderMaterialBase* lightingBaseMaterial = skyrim_cast<RE::BSLightingShaderMaterialBase*>(shaderMaterial)) {
+							textures[0] = GetTexture(lightingBaseMaterial->diffuseTexture, grayTexture);
+
+							bool isModelSpaceNormalMap = shaderFlags.any(EShaderPropertyFlag::kModelSpaceNormals);
+							textures[Constants::MATERIAL_NORMALMAP_ID] = GetTexture(lightingBaseMaterial->normalTexture, normalTexture, isModelSpaceNormalMap);
+
+							if (shaderFlags.any(EShaderPropertyFlag::kSpecular)) {
+								if (shaderFlags.any(EShaderPropertyFlag::kModelSpaceNormals)) {
+									textures[3] = GetTexture(lightingBaseMaterial->specularBackLightingTexture, blackTexture);
+								}
+
+								colors[2] = {
+									lightingBaseMaterial->specularColor.red,
+									lightingBaseMaterial->specularColor.green,
+									lightingBaseMaterial->specularColor.blue,
+									lightingBaseMaterial->specularColorScale
+								};
+
+								scalars[0] = Util::Material::ShininessToRoughness(lightingBaseMaterial->specularPower);
+							}
+
+							// Envmap
+							if (feature == Feature::kEnvironmentMap || feature == Feature::kEye) {
+								if (const auto* lightingEnvmapMaterial = skyrim_cast<RE::BSLightingShaderMaterialEnvmap*>(shaderMaterial)) {
+									textures[4] = GetTexture(lightingEnvmapMaterial->envTexture, blackTexture);
+									textures[5] = GetTexture(lightingEnvmapMaterial->envMaskTexture, blackTexture);
+								}
+							}
+
+							// Glow
+							if (feature == Feature::kGlowMap) {
+								if (const auto* lightingGlowMaterial = skyrim_cast<RE::BSLightingShaderMaterialGlowmap*>(shaderMaterial)) {
+									if (lightingShaderProp->flags.none(EShaderPropertyFlag::kOwnEmit)) {
+										colors[1].x = 1.0f;
+										colors[1].y = 1.0f;
+										colors[1].z = 1.0f;
+									}
+
+									textures[2] = GetTexture(lightingGlowMaterial->glowTexture, blackTexture);
+								}
+							}
+							else if (lightingShaderProp->flags.none(EShaderPropertyFlag::kOwnEmit)) {
+								colors[1].x = 0.0f;
+								colors[1].y = 0.0f;
+								colors[1].z = 0.0f;
+							}
+
+							// Hair
+							if (feature == Feature::kHairTint) {
+								if (const auto* lightingHairTintMaterial = skyrim_cast<RE::BSLightingShaderMaterialHairTint*>(shaderMaterial)) {
+									colors[0].x = lightingHairTintMaterial->tintColor.red;
+
+									colors[0].y = lightingHairTintMaterial->tintColor.green;
+									colors[0].z = lightingHairTintMaterial->tintColor.blue;
+
+									// Load flowmap texture for hair (stored in specularBackLightingTexture slot)
+									textures[3] = GetTexture(lightingBaseMaterial->specularBackLightingTexture, blackTexture);
+								}
+							}
+
+							// FaceGen
+							if (feature == Feature::kFaceGen) {
+								if (const auto* lightingFacegenMaterial = skyrim_cast<RE::BSLightingShaderMaterialFacegen*>(shaderMaterial)) {
+									if (Util::IsPlayerFormID(formID)) {
+										auto& gameRendererRuntimeData = RE::BSGraphics::Renderer::GetSingleton()->GetRuntimeData();
+
+										auto faceTintDescriptor = Scene::GetSingleton()->GetSceneGraph()->GetTextureDescriptor(
+											gameRendererRuntimeData.renderTargets[RE::RENDER_TARGETS::kPLAYER_FACEGEN_TINT].texture
+										);
+
+										textures[4] = faceTintDescriptor ? Texture(faceTintDescriptor, grayTexture.get()) : Texture(grayTexture, nullptr);
+									}
+									else
+										textures[4] = GetTexture(lightingFacegenMaterial->tintTexture, grayTexture);
+
+									textures[5] = GetTexture(lightingFacegenMaterial->detailTexture, detailTexture);
+								}
+							}
+
+							// FaceGen RGB Tint
+							if (feature == Feature::kFaceGenRGBTint) {
+								if (const auto* lightingFacegenTintMaterial = skyrim_cast<RE::BSLightingShaderMaterialFacegenTint*>(shaderMaterial)) {
+									colors[0].x = lightingFacegenTintMaterial->tintColor.red;
+									colors[0].y = lightingFacegenTintMaterial->tintColor.green;
+									colors[0].z = lightingFacegenTintMaterial->tintColor.blue;
+								}
+							}
+						}
+					}
+				}
+				else {
+					logger::warn("[RT] BuildMaterial - BSShaderMaterial is nullptr");
+				}
+			}
+
+			if (auto effectShaderProp = netimmerse_cast<RE::BSEffectShaderProperty*>(effect)) {
+				shaderType = RE::BSShader::Type::Effect;
+
+				if (auto effectMaterial = skyrim_cast<RE::BSEffectShaderMaterial*>(effectShaderProp->material)) {
+					colors[1] = {
+						effectMaterial->baseColor.red,
+						effectMaterial->baseColor.green,
+						effectMaterial->baseColor.blue,
+						effectMaterial->baseColorScale
+					};
+
+					textures[0] = GetTexture(effectMaterial->sourceTexture, blackTexture);
+					textures[2] = GetTexture(effectMaterial->greyscaleTexture, blackTexture);
+				}
+			}
+		}
+	}
+
+	material = Material(
+		shaderFlags,
+		shaderType,
+		feature,
+		pbrFlags,
+		alphaFlags,
+		colors,
+		scalars,
+		texCoordOffsetScales,
+		textures);
 }
 
 void Mesh::CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandList)
@@ -359,7 +645,7 @@ Mesh::UpdateFlags Mesh::Update()
 MeshData Mesh::GetData() const
 {
 	return MeshData(
-		MaterialData(),
+		material.GetData(),
 		static_cast<uint32_t>(m_DescriptorHandle.Get()),
 		{0, 0},
 		localToRoot

@@ -7,19 +7,8 @@
 #include "Instance.hlsli"
 
 #include "Constants.h"
-
-class BindlessLayout : public nvrhi::RefCounter<nvrhi::IBindingLayout>
-{
-public:
-	nvrhi::BindlessLayoutDesc desc;
-	nvrhi::static_vector<D3D12_DESCRIPTOR_RANGE1, 32> descriptorRanges;
-	D3D12_ROOT_PARAMETER1 rootParameter{};
-
-	BindlessLayout(const nvrhi::BindlessLayoutDesc& desc);
-
-	const nvrhi::BindingLayoutDesc* getDesc() const override { return nullptr; }
-	const nvrhi::BindlessLayoutDesc* getBindlessDesc() const override { return &desc; }
-};
+#include "Types/BindlessTable.h"
+#include "Types/TextureReference.h"
 
 class SceneGraph
 {
@@ -40,27 +29,9 @@ class SceneGraph
 	eastl::array<InstanceData, Constants::NUM_INSTANCES_MAX> m_InstanceData;
 	nvrhi::BufferHandle m_InstanceDataBuffer;
 
+	eastl::unordered_map<ID3D11Texture2D*, eastl::unique_ptr<TextureReference>> textures;
+
 	eastl::deque<eastl::string> m_MSNConvertionQueue;
-
-	struct BindlessTable
-	{
-		nvrhi::BindingLayoutHandle m_Layout;
-		eastl::shared_ptr<DescriptorTableManager> m_DescriptorTable;
-
-		BindlessTable(nvrhi::DeviceHandle device, nvrhi::BindlessLayoutDesc desc, bool resizeToMaxCapacity)
-		{
-			m_Layout = device->createBindlessLayout(desc);
-
-			/*auto bindingLayout = reinterpret_cast<BindlessLayout*>(m_Layout.Get());
-
-			for (auto& descriptorRange : bindingLayout->descriptorRanges)
-			{
-				descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-			}*/
-
-			m_DescriptorTable = eastl::make_shared<DescriptorTableManager>(device, m_Layout, resizeToMaxCapacity);
-		}
-	};
 	
 	eastl::unique_ptr<BindlessTable> m_TriangleDescriptors;
 	eastl::unique_ptr<BindlessTable> m_VertexDescriptors;
@@ -86,4 +57,7 @@ public:
 	void CreateModel(RE::TESForm* form, const char* model, RE::NiAVObject* root);
 	void CreateActorModel(RE::Actor* actor, const char* name, RE::NiAVObject* root);
 	void CreateLandModel(RE::TESObjectLAND* land);
+
+	eastl::shared_ptr<DescriptorHandle> GetTextureDescriptor(ID3D11Texture2D* d3d11Texture);
+	eastl::shared_ptr<DescriptorHandle> GetMSNormalMapDescriptor(Mesh* mesh, RE::BSGraphics::Texture* texture);
 };
