@@ -588,13 +588,10 @@ void SceneGraph::AddInstance(RE::FormID formID, RE::NiAVObject* node, eastl::str
 
 void SceneGraph::AddLight(RE::BSLight* light) 
 {
-	logger::info("AddLight");
 	m_Lights.emplace_back(light);
 }
 
 void SceneGraph::RemoveLight(RE::BSLight* light)
 {
-	logger::info("RemoveLight");
-	if (!m_Lights.empty())
-		m_Lights.erase_first(light);
+	m_Lights.erase_first(light);
 }
