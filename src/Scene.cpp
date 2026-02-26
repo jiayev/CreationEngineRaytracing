@@ -100,6 +100,9 @@ bool Scene::Initialize(RendererParams rendererParams) {
 
 void Scene::Render()
 {
+	if (!m_Settings.Enabled)
+		return;
+
 	auto& runtimeData = RE::BSGraphics::RendererShadowState::GetSingleton()->GetRuntimeData();
 
 	auto cameraData = runtimeData.cameraData.getEye();
@@ -242,4 +245,9 @@ void Scene::SetSkyHemisphere(ID3D12Resource* skyHemi)
 	desc.debugName = "Copy Target Texture";
 
 	m_SkyHemisphereTexture = renderer->GetDevice()->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D12_Resource, skyHemi, desc);
+}
+
+void Scene::UpdateSettings(Settings settings)
+{
+	m_Settings = settings;
 }

@@ -66,7 +66,7 @@ void SceneGraph::Initialize()
 
 void SceneGraph::Update(nvrhi::ICommandList* commandList)
 {
-	const auto& lightSettings = Scene::GetSingleton()->settings.LightSettings;
+	const auto& lightSettings = Scene::GetSingleton()->m_Settings.LightSettings;
 
 	m_NumActiveLights = 0;
 
@@ -97,7 +97,7 @@ void SceneGraph::Update(nvrhi::ICommandList* commandList)
 
 		auto& lightData = m_LightData[m_NumActiveLights];
 
-		lightData.Color = float3(runtimeData.diffuse.red, runtimeData.diffuse.green, runtimeData.diffuse.blue);
+		lightData.Color = float3(runtimeData.diffuse.red, runtimeData.diffuse.green, runtimeData.diffuse.blue) * lightSettings.Point;
 
 		lightData.Radius = runtimeData.radius.x;
 

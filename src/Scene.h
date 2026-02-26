@@ -10,6 +10,8 @@
 #include "interop/CameraData.hlsli"
 #include "interop/SharedData.hlsli"
 
+#include "Types/Settings.h"
+
 struct Scene
 {
 	eastl::unique_ptr<SceneGraph> m_SceneGraph;
@@ -30,43 +32,7 @@ struct Scene
 	ID3D12Resource* m_SkyHemisphereResource = nullptr;
 	nvrhi::TextureHandle m_SkyHemisphereTexture;
 
-	struct LightSettings
-	{
-		float Directional = 1.0f;
-		float Point = 1.0f;
-		bool LodDimmer = false;
-	};
-
-	struct LightingSettings
-	{
-		float Emissive = 1.0f;
-		float Effect = 1.0f;
-		float Sky = 1.0f;
-	};
-
-	struct RaytracingSettings
-	{
-		int Bounces = 2;
-		int SamplesPerPixel = 1;
-		bool RussianRoulette = true;
-		float TexLODBias = -1.0f;
-	};
-
-	struct MaterialSettings
-	{
-		float2 Roughness = { 0.0f, 1.0f };
-		float2 Metalness = { 0.0f, 1.0f };
-	};
-
-	struct Settings
-	{
-		bool Enabled = true;
-		bool PathTracing = true;
-		LightSettings LightSettings;
-		LightingSettings LightingSettings;
-		RaytracingSettings RaytracingSettings;
-		MaterialSettings MaterialSettings;
-	} settings;
+	Settings m_Settings;
 
 	Scene();
 
@@ -83,6 +49,8 @@ struct Scene
 	inline auto GetCameraBuffer() const { return m_CameraBuffer; }
 
 	inline auto GetFeatureBuffer() const { return m_FeatureBuffer; }
+
+	inline bool ApplyPathTracingCull() const { return m_Settings.Enabled && m_Settings.PathTracing && m_Settings.DebugSettings.PathTracingCull; };
 
 	inline nvrhi::ITexture* GetSkyHemiTexture() const { return m_SkyHemisphereTexture; }
 
@@ -105,4 +73,6 @@ struct Scene
 	void UpdateFeatureData(void* data, uint32_t size);
 
 	void SetSkyHemisphere(ID3D12Resource* skyHemi);
+
+	void UpdateSettings(Settings settings);
 };

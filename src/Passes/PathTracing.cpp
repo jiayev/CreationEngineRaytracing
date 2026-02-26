@@ -20,7 +20,7 @@ namespace Pass
 		CreateRootSignature();
 
 		auto* scene = Scene::GetSingleton();
-		auto& rtSettings = scene->settings.RaytracingSettings;
+		auto& rtSettings = scene->m_Settings.RaytracingSettings;
 
 		const auto bouncesWStr = std::to_wstring(rtSettings.Bounces);
 		const auto samplesWStr = std::to_wstring(rtSettings.SamplesPerPixel);

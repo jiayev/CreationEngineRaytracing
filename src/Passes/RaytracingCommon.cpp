@@ -67,7 +67,7 @@ namespace Pass
 		auto* scene = Scene::GetSingleton();
 		auto* sceneGraph = scene->GetSceneGraph();
 
-		auto& settings = scene->settings;
+		auto& settings = scene->m_Settings;
 
 		auto cameraData = RE::BSGraphics::RendererShadowState::GetSingleton()->GetRuntimeData().cameraData.getEye();
 		m_RaytracingData->PixelConeSpreadAngle = std::atan((2.0f / cameraData.projMat.m[1][1]) / GetRenderer()->GetRenderSize().y);

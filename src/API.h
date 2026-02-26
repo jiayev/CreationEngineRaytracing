@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Types/Settings.h"
+
 extern "C" {
 	CERT_API bool Initialize(ID3D11Device5* d3d11Device, ID3D12Device5* d3d12Device, ID3D12CommandQueue* commandQueue, ID3D12CommandQueue* computeCommandQueue, ID3D12CommandQueue* copyCommandQueue);
 	CERT_API void ExecutePasses();
@@ -12,4 +14,5 @@ extern "C" {
 	CERT_API void UpdateFeatureData(void* data, uint32_t size);
 	CERT_API void SetSkyHemisphere(ID3D12Resource* skyHemi);
 	CERT_API float* GetFrameTime();
+	CERT_API void UpdateSettings(Settings);
 }

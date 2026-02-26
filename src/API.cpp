@@ -62,3 +62,9 @@ float* GetFrameTime()
 {
 	return Renderer::GetSingleton()->GetFrameTime();
 }
+
+void UpdateSettings(Settings settings)
+{
+	auto* scene = Scene::GetSingleton();
+	scene->UpdateSettings(settings);
+}

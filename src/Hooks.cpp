@@ -37,7 +37,7 @@ namespace Hooks
 
 	void BSCullingProcess_AppendVirtual::thunk(RE::BSCullingProcess* cullingProcess, RE::BSGeometry& geometry, uint32_t a_arg2)
 	{
-		if (Scene::GetSingleton()->settings.Enabled)
+		if (Scene::GetSingleton()->ApplyPathTracingCull())
 			return;
 
 		func(cullingProcess, geometry, a_arg2);
@@ -45,7 +45,7 @@ namespace Hooks
 
 	void BSFadeNodeCuller_AppendVirtual::thunk(RE::BSFadeNodeCuller* culler, RE::BSGeometry& geometry, uint32_t a_arg2)
 	{
-		if (Scene::GetSingleton()->settings.Enabled)
+		if (Scene::GetSingleton()->ApplyPathTracingCull())
 			return;
 
 		func(culler, geometry, a_arg2);
@@ -53,7 +53,7 @@ namespace Hooks
 
 	void NiCullingProcess_AppendVirtual::thunk(RE::NiCullingProcess* cullingProcess, RE::BSGeometry& geometry, uint32_t a_arg2)
 	{
-		if (Scene::GetSingleton()->settings.Enabled)
+		if (Scene::GetSingleton()->ApplyPathTracingCull())
 			return;
 
 		func(cullingProcess, geometry, a_arg2);
@@ -63,7 +63,7 @@ namespace Hooks
 	{
 		// Skip rendering geometry that has been determined to be occluded
 		// Never cull during reflection rendering - reflections need all visible geometry
-		if (Scene::GetSingleton()->settings.Enabled && pass->shader && pass->geometry) {
+		if (Scene::GetSingleton()->ApplyPathTracingCull() && pass->shader && pass->geometry) {
 			switch (pass->shader->shaderType.get()) {
 			case RE::BSShader::Type::Grass:
 			case RE::BSShader::Type::Sky:
@@ -130,17 +130,17 @@ namespace Hooks
 
 		stl::detour_thunk<Main_RenderWorld>(REL::RelocationID(100424, 107142));
 
-		/*stl::write_vfunc<0x18, BSCullingProcess_AppendVirtual>(RE::VTABLE_BSCullingProcess[0]);
+		stl::write_vfunc<0x18, BSCullingProcess_AppendVirtual>(RE::VTABLE_BSCullingProcess[0]);
 		stl::write_vfunc<0x18, BSFadeNodeCuller_AppendVirtual>(RE::VTABLE_BSFadeNodeCuller[0]);
 		stl::write_vfunc<0x18, NiCullingProcess_AppendVirtual>(RE::VTABLE_NiCullingProcess[0]);
 
-		stl::write_thunk_call<BSBatchRenderer_RenderPassImmediately>(REL::RelocationID(100852, 107642).address() + REL::Relocate(0x29E, 0x28F));*/
+		stl::write_thunk_call<BSBatchRenderer_RenderPassImmediately>(REL::RelocationID(100852, 107642).address() + REL::Relocate(0x29E, 0x28F));
 
 		stl::detour_thunk<ShadowSceneNode_AddLight>(REL::RelocationID(99692, 106326));
 		stl::detour_thunk<ShadowSceneNode_RemoveLight>(REL::RelocationID(99698, 106332));
 #elif defined(FALLOUT4)
 #	if defined(FALLOUT_POST_NG)
-		stl::detour_thunk<TES_AttachModel>(REL::ID(2192085));
+		stl::detour_thunk<TES_At77777tachModel>(REL::ID(2192085));
 #	endif
 #endif
 		logger::info("[Raytracing] Installed hooks");

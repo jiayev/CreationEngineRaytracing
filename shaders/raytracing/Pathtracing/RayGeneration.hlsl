@@ -350,5 +350,5 @@ void Main()
     //const float2 envBRDF = BRDF::EnvBRDFApproxHirvonen(sourceSurface.Roughness, sourceBRDFContext.NdotV);
     //const float3 specularAlbedo = float3(sourceSurface.F0 * envBRDF.x + envBRDF.y);
 
-    Output[idx] = float4(direct + radiance, 1.0f);
+    Output[idx] = float4(LLTrueLinearToGamma(direct + radiance), 1.0f);
 }
