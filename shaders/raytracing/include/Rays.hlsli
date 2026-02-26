@@ -133,6 +133,51 @@ float3 OffsetRay(float3 position, float3 normal, bool hasTransmission = false)
     return position + offset;
 }
 
+Payload TraceRayStandard(RaytracingAccelerationStructure scene, RayDesc ray, inout uint randomSeed)
+{
+    Payload payload;
+    payload.hitDistance = -1.0f;
+    payload.primitiveIndex = 0;
+    payload.PackBarycentrics(float2(0.0f, 0.0f));
+    payload.PackInstanceGeometryIndex(0, 0);
+    payload.randomSeed = randomSeed;
+
+#if USE_RAY_QUERY
+    RayQuery<RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
+    rayQuery.TraceRayInline(scene, RAY_FLAG_NONE, 0xFF, ray);
+
+    while (rayQuery.Proceed())
+    {
+        if (rayQuery.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+        {
+            if (ConsiderTransparentMaterial(
+                rayQuery.CandidateInstanceIndex(),
+                rayQuery.CandidateGeometryIndex(),
+                rayQuery.CandidatePrimitiveIndex(),   
+                rayQuery.CandidateTriangleBarycentrics(),
+                randomSeed))
+            {
+                rayQuery.CommitNonOpaqueTriangleHit();
+            }
+        }
+    }
+
+    if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    {
+        payload.hitDistance = rayQuery.CommittedRayT();
+        payload.primitiveIndex = rayQuery.CommittedPrimitiveIndex();
+        payload.PackBarycentrics(rayQuery.CommittedTriangleBarycentrics());
+        payload.PackInstanceGeometryIndex(rayQuery.CommittedInstanceIndex(), rayQuery.CommittedGeometryIndex());
+    }
+#else // !USE_RAY_QUERY    
+    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES, 0xFF, DIFFUSE_RAY_HITGROUP_IDX, 0, DIFFUSE_RAY_MISS_IDX, ray, payload);
+ #endif
+    
+    randomSeed = payload.randomSeed;
+    
+    return payload;
+}
+
 float3 TraceRayShadow(RaytracingAccelerationStructure scene, Surface surface, float3 direction, inout uint randomSeed)
 {
     RayDesc ray;
@@ -148,8 +193,8 @@ float3 TraceRayShadow(RaytracingAccelerationStructure scene, Surface surface, fl
     shadowPayload.transmission = float3(1.0f, 1.0f, 1.0f);
 
 #if USE_RAY_QUERY
-    RayQuery<RAY_FLAG_NONE> rayQuery;
-    rayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
+    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
+    rayQuery.TraceRayInline(scene, RAY_FLAG_NONE, 0xFF, ray);
 
     while (rayQuery.Proceed())
     {
@@ -198,7 +243,7 @@ float3 TraceRayShadowFinite(RaytracingAccelerationStructure scene, Surface surfa
 
 #if USE_RAY_QUERY
     RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
-    rayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
+    rayQuery.TraceRayInline(scene, RAY_FLAG_NONE, 0xFF, ray);
 
     while (rayQuery.Proceed())
     {
@@ -248,8 +293,8 @@ Payload SampleSubsurface(RaytracingAccelerationStructure scene, const float3 sam
     payload.randomSeed = randomSeed;
 
 #if USE_RAY_QUERY
-    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
-    rayQuery.TraceRayInline(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, ray);
+    RayQuery<RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
+    rayQuery.TraceRayInline(scene, RAY_FLAG_NONE, 0xFF, ray);
 
     while (rayQuery.Proceed())
     {
@@ -277,7 +322,7 @@ Payload SampleSubsurface(RaytracingAccelerationStructure scene, const float3 sam
     }
     
 #else // !USE_RAY_QUERY    
-    TraceRay(scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, DIFFUSE_RAY_HITGROUP_IDX, 0, DIFFUSE_RAY_MISS_IDX, ray, payload);
+    TraceRay(scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES, 0xFF, DIFFUSE_RAY_HITGROUP_IDX, 0, DIFFUSE_RAY_MISS_IDX, ray, payload);
  #endif   
     
     randomSeed = payload.randomSeed;
