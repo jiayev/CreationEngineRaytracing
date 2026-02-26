@@ -122,7 +122,7 @@ bool ConsiderTransparentMaterialShadow(uint instanceIndex, uint geometryIndex, u
 
         float3 normalWS = normalize(mul(objectToWorld3x3, Interpolate(v0.Normal, v1.Normal, v2.Normal, uvw)));
         float3 bitangentWS = normalize(mul(objectToWorld3x3, Interpolate(v0.Bitangent, v1.Bitangent, v2.Bitangent, uvw)));
-        float3 tangentWS = cross(normalWS, bitangentWS) * Interpolate(v0.Handedness, v1.Handedness, v2.Handedness, uvw);  
+        float3 tangentWS = cross(bitangentWS, normalWS) * Interpolate(v0.Handedness, v1.Handedness, v2.Handedness, uvw);  
         
         Texture2D normalTexture = Textures[NonUniformResourceIndex(material.NormalTexture())];
         float3 normal = normalTexture.SampleLevel(DefaultSampler, texCoord, 0).xyz;

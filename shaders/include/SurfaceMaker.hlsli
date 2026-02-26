@@ -63,7 +63,7 @@ struct SurfaceMaker
 
         float3 normalWS = normalize(mul(objectToWorld3x3, Interpolate(normal0, normal1, normal2, uvw)));
         float3 bitangentWS = normalize(mul(objectToWorld3x3, Interpolate(v0.Bitangent, v1.Bitangent, v2.Bitangent, uvw)));
-        float3 tangentWS = cross(normalWS, bitangentWS) * Interpolate(v0.Handedness, v1.Handedness, v2.Handedness, uvw);        
+        float3 tangentWS = cross(bitangentWS, normalWS) * Interpolate(v0.Handedness, v1.Handedness, v2.Handedness, uvw);        
         
         surface.FaceNormal = mul(objectToWorld3x3, objectSpaceFlatNormal);
 
