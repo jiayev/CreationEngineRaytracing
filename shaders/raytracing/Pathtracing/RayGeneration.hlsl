@@ -21,12 +21,12 @@
 #   include "include/ThreadGroupTilingX.hlsli"
 #endif
 
-#define GROUP_SIZE (16)
+#define GROUP_SIZE (32)
 
 #if USE_RAY_QUERY
 [numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
 #   if defined(GROUP_TILING)
-void Main(int2 GTid : SV_GroupThreadID, int2 Gid : SV_GroupID)
+void Main(uint2 GTid : SV_GroupThreadID, uint2 Gid : SV_GroupID)
 #   else
 void Main(uint2 idx : SV_DispatchThreadID)
 #   endif
@@ -38,7 +38,7 @@ void Main()
 #if USE_RAY_QUERY
     uint2 size = Camera.RenderSize;  
 #   if defined(GROUP_TILING)    
-    uint2 idx = ThreadGroupTilingX((uint2)ceil(size / GROUP_SIZE), GROUP_SIZE.xx, 16, GTid.xy, Gid.xy);
+    uint2 idx = ThreadGroupTilingX((uint2)ceil(size / GROUP_SIZE), GROUP_SIZE.xx, 32, GTid.xy, Gid.xy);
 #   endif
     if (any(idx >= size))
         return;
@@ -47,7 +47,6 @@ void Main()
     uint2 size = DispatchRaysDimensions().xy;
 #endif
 
-    
 #if defined(SHARC)
     SharcParameters sharcParameters = GetSharcParameters();
 
