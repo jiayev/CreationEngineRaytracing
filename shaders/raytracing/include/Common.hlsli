@@ -42,7 +42,7 @@ float3 GetView(uint2 idx, uint2 size, float4x4 projInverse)
     const float4 clip = float4(screenPos, 1.0f, 1.0f);
     float4 viewDirection = mul(projInverse, clip);
    
-    return viewDirection / viewDirection.w;
+    return viewDirection.xyz / viewDirection.w;
 }
 
 RayDesc SetupPrimaryRay(float3 viewDirection, CameraData camera)
