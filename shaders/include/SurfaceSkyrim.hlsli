@@ -9,11 +9,9 @@
 #define LIGHTINGSETTINGS Raytracing
 #define HAIRSETTINGS Features.HairSpecular
 
-void DefaultMaterial(inout Surface surface, in Vertex v0, in Vertex v1, in Vertex v2, in float3 uvw, in float3 normalWS, in float3 tangentWS, in float3 bitangentWS, float3x3 objectToWorld3x3, in Material material)
+void DefaultMaterial(inout Surface surface, in float2 texCoord0, in float4 vertexColor, in float3 normalWS, in float3 tangentWS, in float3 bitangentWS, in Material material)
 {
     float mipLevel = surface.MipLevel;
-    
-    float2 texCoord0 = material.TexCoord(Interpolate(v0.Texcoord0, v1.Texcoord0, v2.Texcoord0, uvw));
 
 #if defined(DEBUG_SHADERTYPE)
     [branch]
@@ -31,9 +29,8 @@ void DefaultMaterial(inout Surface surface, in Vertex v0, in Vertex v1, in Verte
 #else
     Texture2D baseTexture = Textures[NonUniformResourceIndex(material.BaseTexture())];
 
-    float4 vertexColor = Interpolate(v0.Color.unpack(), v1.Color.unpack(), v2.Color.unpack(), uvw);
     vertexColor = saturate(vertexColor / max(max(vertexColor.r, vertexColor.g), vertexColor.b));
-
+    
     const bool isWindows = (material.Feature == Feature::kGlowMap || material.PBRFlags & PBR::Flags::HasEmissive) && material.ShaderFlags & ShaderFlags::kAssumeShadowmask;
     float3 windowAlpha = float3(0.0f, 0.0f, 0.0f);
 
@@ -354,21 +351,14 @@ void DefaultMaterial(inout Surface surface, in Vertex v0, in Vertex v1, in Verte
         }
     }
 
-    void LandMaterial(inout Surface surface, in Vertex v0, in Vertex v1, in Vertex v2, float3 uvw, float3 normalWS, float3 tangentWS, float3 bitangentWS, in Material material)
+    void LandMaterial(inout Surface surface, in float2 texCoord0, in float4 vertexColor, float3 normalWS, float3 tangentWS, float3 bitangentWS, float4 landBlend0, float4 landBlend1, in Material material)
     {
         float mipLevel = surface.MipLevel;
     
-        float2 texCoord0 = material.TexCoord(Interpolate(v0.Texcoord0, v1.Texcoord0, v2.Texcoord0, uvw));
-
         Texture2D overlayTexture = Textures[NonUniformResourceIndex(material.OverlayTexture())];
         Texture2D noiseTexture = Textures[NonUniformResourceIndex(material.NoiseTexture())];
 
-        float4 vertexColor = Interpolate(v0.Color.unpack(), v1.Color.unpack(), v2.Color.unpack(), uvw);
-
         float handedness = (dot(cross(normalWS, tangentWS), bitangentWS) < 0.0f) ? -1.0f : 1.0f;
-
-        float4 landBlend0 = Interpolate(v0.LandBlend0.unpack(), v1.LandBlend0.unpack(), v2.LandBlend0.unpack(), uvw);
-        float4 landBlend1 = Interpolate(v0.LandBlend1.unpack(), v1.LandBlend1.unpack(), v2.LandBlend1.unpack(), uvw);
 
 	// Normalise blend weights
         float totalWeight = landBlend0.x + landBlend0.y + landBlend0.z +

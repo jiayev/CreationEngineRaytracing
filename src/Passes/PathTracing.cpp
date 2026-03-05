@@ -32,7 +32,8 @@ namespace Pass
 			{ L"SHARC", L"" },
 			{ L"SHARC_UPDATE", L"0" },
 			{ L"SHARC_RESOLVE", L"0" },
-			{ L"SHARC_DEBUG", L"0" }
+			{ L"SHARC_DEBUG", L"0" },
+			{ L"DEBUG_TRACE_HEATMAP", L"0" }			
 		};
 
 		if (GetRenderer()->m_Settings.UseRayQuery)
@@ -70,7 +71,13 @@ namespace Pass
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(6),
 			nvrhi::BindingLayoutItem::Sampler(0),
 			nvrhi::BindingLayoutItem::Texture_UAV(0)
+			
 		};
+
+#if defined(NVAPI)
+		globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::TypedBuffer_UAV(127));
+#endif
+
 		m_BindingLayout = GetRenderer()->GetDevice()->createBindingLayout(globalBindingLayoutDesc);
 	}
 
@@ -86,20 +93,21 @@ namespace Pass
 		auto rayGenLib = ShaderUtils::CompileShaderLibrary(device, L"data/shaders/raytracing/PathTracing/RayGeneration.hlsl", defines);
 		auto missLib = ShaderUtils::CompileShaderLibrary(device, L"data/shaders/raytracing/PathTracing/Miss.hlsl", defines);
 		auto hitLib = ShaderUtils::CompileShaderLibrary(device, L"data/shaders/raytracing/PathTracing/ClosestHit.hlsl", defines);
+		auto anyHitLib = ShaderUtils::CompileShaderLibrary(device, L"data/shaders/raytracing/PathTracing/AnyHit.hlsl", defines);
 
 		nvrhi::rt::PipelineDesc pipelineDesc;
 
 		// Pipeline Shaders
 		pipelineDesc.shaders = {
 			{ "RayGen", rayGenLib->getShader("Main", nvrhi::ShaderType::RayGeneration), nullptr },
-			{ "Miss", missLib->getShader("Main", nvrhi::ShaderType::Miss), nullptr },
+			{ "Miss", missLib->getShader("Main", nvrhi::ShaderType::Miss), nullptr }
 		};
 
 		pipelineDesc.hitGroups = {
 			{
 				"HitGroup",
 				hitLib->getShader("Main", nvrhi::ShaderType::ClosestHit),
-				nullptr,  // any hit
+				anyHitLib->getShader("Main", nvrhi::ShaderType::AnyHit),
 				nullptr,  // intersection
 				nullptr,  // binding layout
 				false     // isProceduralPrimitive
@@ -117,16 +125,24 @@ namespace Pass
 		pipelineDesc.maxPayloadSize = 20;
 		pipelineDesc.allowOpacityMicromaps = true;
 
+#if defined(NVAPI)
+		pipelineDesc.hlslExtensionsUAV = 127;
+#endif
+
 		m_RayPipeline = device->createRayTracingPipeline(pipelineDesc);
 		if (!m_RayPipeline)
 			return false;
 
-		m_ShaderTable = m_RayPipeline->createShaderTable();
+		auto shaderTableDesc = nvrhi::rt::ShaderTableDesc()
+			.enableCaching(3)
+			.setDebugName("Shader Table");
+
+		m_ShaderTable = m_RayPipeline->createShaderTable(shaderTableDesc);
 		if (!m_ShaderTable)
 			return false;
 
-		m_ShaderTable->setRayGenerationShader("RayGen");  // matches exportName above
-		m_ShaderTable->addMissShader("Miss");            // see note below
+		m_ShaderTable->setRayGenerationShader("RayGen");
+		m_ShaderTable->addMissShader("Miss");
 		m_ShaderTable->addHitGroup("HitGroup");
 
 		return true;
@@ -188,8 +204,13 @@ namespace Pass
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_SHaRC->GetResolveBuffer()),
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(6, m_SHaRC->GetHashEntriesBuffer()),
 			nvrhi::BindingSetItem::Sampler(0, m_LinearWrapSampler),
-			nvrhi::BindingSetItem::Texture_UAV(0, renderer->GetMainTexture())
+			nvrhi::BindingSetItem::Texture_UAV(0, renderer->GetMainTexture())			
 		};
+
+		
+#if defined(NVAPI)
+		bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::TypedBuffer_UAV(127, nullptr));
+#endif
 
 		m_BindingSet = renderer->GetDevice()->createBindingSet(bindingSetDesc, m_BindingLayout);
 
@@ -210,7 +231,7 @@ namespace Pass
 			m_LightTLAS->GetLightDescriptorTable()
 		};
 
-		auto resolution = Renderer::GetSingleton()->GetResolution();
+		auto resolution = Renderer::GetSingleton()->GetDynamicResolution();
 
 		if (m_RayPipeline)
 		{

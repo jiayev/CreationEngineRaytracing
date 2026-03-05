@@ -587,7 +587,6 @@ void Mesh::CreateBuffers(SceneGraph* sceneGraph, nvrhi::ICommandList* commandLis
 
 		// Write vertex SRV
 		device->writeDescriptorTable(sceneGraph->GetVertexDescriptors()->m_DescriptorTable->GetDescriptorTable(), vertexBindingSet);
-		//m_VertexDescriptorHandle = sceneGraph->GetVertexDescriptors()->m_DescriptorTable->CreateDescriptorHandle(vertexBindingSet);
 	}
 
 	// Updatable geometry is already in root space

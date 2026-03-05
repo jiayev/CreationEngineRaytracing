@@ -2,15 +2,6 @@
 #define SURFACE_HLSL
 
 #include "include/Common.hlsli"
-#include "raytracing/include/Common.hlsli"
-
-#if !defined(RASTER)
-#   include "raytracing/include/Payload.hlsli"
-#   include "raytracing/include/Geometry.hlsli"
-
-#   include "raytracing/include/Materials/TexLODHelpers.hlsli"
-#endif
-
 #include "include/PBR.hlsli"
 
 struct Subsurface

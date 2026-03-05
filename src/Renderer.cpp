@@ -171,6 +171,14 @@ uint2 Renderer::GetResolution()
 	return m_RenderSize;
 }
 
+uint2 Renderer::GetDynamicResolution()
+{
+	return { 
+		static_cast<uint32_t>(m_RenderSize.x * m_DynamicResolutionRatio.x),  
+		static_cast<uint32_t>(m_RenderSize.y * m_DynamicResolutionRatio.y)
+	};
+}
+
 void Renderer::CheckResolutionResources()
 {
 	if (m_RenderSize == m_PendingRenderSize)
@@ -226,6 +234,10 @@ void Renderer::SetCopyTarget(ID3D12Resource* target)
 void Renderer::ExecutePasses()
 {
 	CheckResolutionResources();
+
+	auto& stateRuntime = RE::BSGraphics::State::GetSingleton()->GetRuntimeData();
+
+	m_DynamicResolutionRatio = { stateRuntime.dynamicResolutionWidthRatio, stateRuntime.dynamicResolutionHeightRatio };
 
 	// Get current command list
 	auto commandList = GetCommandList();

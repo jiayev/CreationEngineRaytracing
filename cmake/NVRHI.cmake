@@ -24,6 +24,10 @@ set(AUTO_LOCATE_VULKAN OFF CACHE BOOL "" FORCE)
 
 set(DXHEADERS_INSTALL OFF CACHE BOOL "" FORCE)
 
+if (NVRHI_WITH_NVAPI)
+	include(nvapi)
+endif()
+
 FetchContent_MakeAvailable(nvrhi)
 
 target_link_libraries(

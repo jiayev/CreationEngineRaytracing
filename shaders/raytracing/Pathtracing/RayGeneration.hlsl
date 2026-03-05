@@ -1,3 +1,11 @@
+#if !(defined(SHARC) && SHARC_UPDATE) && DEBUG_TRACE_HEATMAP
+#   define NV_SHADER_EXTN_SLOT u127
+#   define NV_SHADER_EXTN_REGISTER_SPACE space0
+#   include "include/nvapi/nvHLSLExtns.h"
+
+#   include "include/nvapi/Profiling.hlsli"
+#endif
+
 #include "raytracing/Pathtracing/Registers.hlsli"
 
 #include "include/Common.hlsli"
@@ -74,10 +82,28 @@ void Main()
     
     const float3 sourceDirection = sourceRay.Direction;
     
-    uint randomSeed = InitRandomSeed(idx, size, Camera.FrameIndex);    
+    uint randomSeed = InitRandomSeed(idx, size, Camera.FrameIndex);
+    
+#if !(defined(SHARC) && SHARC_UPDATE) && DEBUG_TRACE_HEATMAP       
+    uint startTime = NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO );
+#endif
     
     Payload sourcePayload = TraceRayStandard(Scene, sourceRay, randomSeed);
 
+#if !(defined(SHARC) && SHARC_UPDATE) && DEBUG_TRACE_HEATMAP       
+    uint endTime = NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO );
+    uint deltaTime = timediff(startTime, endTime);
+    
+    // Scale the time delta value to [0,1]
+    static float heatmapScale = 300000.0f; // somewhat arbitrary scaling factor, experiment to find a value that works well in your app 
+    float deltaTimeScaled =  clamp( (float)deltaTime / heatmapScale, 0.0f, 1.0f );
+
+    // Compute the heatmap color and write it to the output pixel
+    Output[idx] = float4(temperature(deltaTimeScaled), 1.0f);     
+    
+    return;
+ #endif
+    
     if (!sourcePayload.Hit())
     {
 #if !(defined(SHARC) && SHARC_UPDATE)
@@ -92,7 +118,7 @@ void Main()
     
     Instance sourceInstance;
     Material sourceMaterial;
-    
+
     Surface sourceSurface = SurfaceMaker::make(sourcePosition, sourcePayload, sourceDirection, sourceRayCone, sourceInstance, sourceMaterial);
 
     BRDFContext sourceBRDFContext = BRDFContext::make(sourceSurface, -sourceDirection);

@@ -15,6 +15,7 @@
 #include "Passes/PathTracing.h"
 #include "Passes/LightTLAS.h"
 #include "Passes/SHaRC.h"
+#include "Passes/Raster/GBuffer.h"
 
 Scene::Scene()
 {
@@ -69,7 +70,7 @@ bool Scene::Initialize(RendererParams rendererParams) {
 		sizeof(FeatureData), "Feature Data", Constants::MAX_CB_VERSIONS));
 
 	// Raytracing passes require a 'RaytracingCommon' pass to create and manage the TLAS
-	{
+	/*{
 		m_GlobalIllumination = eastl::make_unique<RenderNode>(true, "Global Illumination", eastl::make_unique<Pass::RaytracingCommon>(renderer));
 
 		m_GlobalIllumination->AddNode({
@@ -80,7 +81,7 @@ bool Scene::Initialize(RendererParams rendererParams) {
 				m_GlobalIllumination->GetPass<Pass::RaytracingCommon>())
 			}
 		);
-	}
+	}*/
 
 	{
 		m_PathTracing = eastl::make_unique<RenderNode>(true, "Path Tracing");
@@ -117,6 +118,8 @@ bool Scene::Initialize(RendererParams rendererParams) {
 			}
 		);
 	}
+
+	//m_GBuffer = eastl::make_unique<RenderNode>(true, "GBuffer", eastl::make_unique<Pass::GBuffer>(renderer));
 
 	renderer->GetRenderGraph()->AttachRootNode(m_PathTracing.get());
 
@@ -229,9 +232,11 @@ void Scene::UpdateCameraData() const
 	auto* renderer = Renderer::GetSingleton();
 
 	m_CameraData->FrameIndex = renderer->GetFrameIndex() % UINT_MAX;
-	m_CameraData->RenderSize = renderer->GetRenderSize();
+	m_CameraData->RenderSize = renderer->GetDynamicResolution();
 
 	m_CameraData->PositionPrev = Util::Math::Float3(runtimeData.previousPosAdjust.getEye());
+
+	m_CameraData->ViewProj = cameraData.viewProjMatrixUnjittered;
 }
 
 void Scene::UpdateFeatureData(void* data, uint32_t size)

@@ -1,8 +1,6 @@
 #ifndef PBR_HLSL
 #define PBR_HLSL
 
-#include "raytracing/include/Common.hlsli"
-
 namespace PBR
 {
     namespace Flags

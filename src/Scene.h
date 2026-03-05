@@ -21,6 +21,7 @@ struct Scene
 
 	eastl::unique_ptr<RenderNode> m_GlobalIllumination;
 	eastl::unique_ptr<RenderNode> m_PathTracing;
+	eastl::unique_ptr<RenderNode> m_GBuffer;
 
 	eastl::unique_ptr<CameraData> m_CameraData;
 	nvrhi::BufferHandle m_CameraBuffer;

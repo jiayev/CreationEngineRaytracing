@@ -2,7 +2,7 @@
 #define TRANSPARENCY_HLSLI
 
 #include "include/Common.hlsli"
-#include "include/BRDF.hlsli"
+#include "include/Common/BRDF.hlsli"
 #include "include/PBR.hlsli"
 #include "raytracing/include/Common.hlsli"
 

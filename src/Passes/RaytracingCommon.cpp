@@ -70,7 +70,7 @@ namespace Pass
 		auto& settings = scene->m_Settings;
 
 		auto cameraData = RE::BSGraphics::RendererShadowState::GetSingleton()->GetRuntimeData().cameraData.getEye();
-		m_RaytracingData->PixelConeSpreadAngle = std::atan((2.0f / cameraData.projMat.m[1][1]) / GetRenderer()->GetRenderSize().y);
+		m_RaytracingData->PixelConeSpreadAngle = std::atan((2.0f / cameraData.projMat.m[1][1]) / GetRenderer()->GetDynamicResolution().y);
 		m_RaytracingData->TexLODBias = settings.RaytracingSettings.TexLODBias;
 
 		m_RaytracingData->NumLights = static_cast<uint32_t>(sceneGraph->GetLights().size());

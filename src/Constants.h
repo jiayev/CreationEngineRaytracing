@@ -20,4 +20,6 @@ namespace Constants
 
 	static constexpr uint32_t NUM_TEXTURES_MIN = 512;
 	static constexpr uint32_t NUM_TEXTURES_MAX = 8 * 1024;
+
+	static constexpr uint32_t OMM_SUBDIV_LEVEL = 3;
 }

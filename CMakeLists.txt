@@ -23,6 +23,16 @@ option(
     OFF
 )
 
+option(
+    NVRHI_WITH_NVAPI
+    "Builds NVRHI with NVAPI for runtime shader profiling"
+    OFF
+)
+
+if (NVRHI_WITH_NVAPI)
+    add_compile_definitions(NVAPI)
+endif()
+
 # #######################################################################################################################
 # # Add CMake features
 # #######################################################################################################################

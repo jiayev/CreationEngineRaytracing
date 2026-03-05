@@ -48,7 +48,7 @@ struct SurfaceMaker
         material = mesh.Material;
 
         float2 texCoord0 = material.TexCoord(Interpolate(v0.Texcoord0, v1.Texcoord0, v2.Texcoord0, uvw));
-
+       
         float3x3 objectToWorld3x3 = mul((float3x3) instance.Transform, (float3x3) mesh.Transform);
 
         float coneTexLODValue = ComputeRayConeTriangleLODValue(v0, v1, v2, objectToWorld3x3);
@@ -65,6 +65,8 @@ struct SurfaceMaker
         float3 bitangentWS = normalize(mul(objectToWorld3x3, Interpolate(v0.Bitangent, v1.Bitangent, v2.Bitangent, uvw)));
         float3 tangentWS = cross(bitangentWS, normalWS) * Interpolate(v0.Handedness, v1.Handedness, v2.Handedness, uvw);        
         
+        float4 vertexColor = Interpolate(v0.Color.unpack(), v1.Color.unpack(), v2.Color.unpack(), uvw);
+
         surface.FaceNormal = mul(objectToWorld3x3, objectSpaceFlatNormal);
 
         surface.MipLevel = rayCone.computeLOD(coneTexLODValue, rayDir, normalWS, true) + Raytracing.TexLODBias;
@@ -87,9 +89,65 @@ struct SurfaceMaker
     
 #   if defined(SKYRIM)
         if (material.Feature == Feature::kMultiTexLandLODBlend)
-            LandMaterial(surface, v0, v1, v2, uvw, normalWS, tangentWS, bitangentWS, material);
+        {
+            float4 landBlend0 = Interpolate(v0.LandBlend0.unpack(), v1.LandBlend0.unpack(), v2.LandBlend0.unpack(), uvw);
+            float4 landBlend1 = Interpolate(v0.LandBlend1.unpack(), v1.LandBlend1.unpack(), v2.LandBlend1.unpack(), uvw);
+            
+            LandMaterial(surface, texCoord0, vertexColor, normalWS, tangentWS, bitangentWS, landBlend0, landBlend1, material);
+        }
         else
-            DefaultMaterial(surface, v0, v1, v2, uvw, normalWS, tangentWS, bitangentWS, objectToWorld3x3, material);
+        {
+            DefaultMaterial(surface, texCoord0, vertexColor, normalWS, tangentWS, bitangentWS, material);
+        }
+#   else   
+#   endif
+   
+        surface.Roughness = PBR::Roughness(surface.Roughness, Raytracing.Roughness.x, Raytracing.Roughness.y);
+        surface.Metallic = Remap(surface.Metallic, Raytracing.Metalness.x, Raytracing.Metalness.y);
+
+        surface.DiffuseAlbedo = surface.Albedo * (1.0f - surface.Metallic);
+
+        surface.F0 = PBR::F0(surface.F0, surface.Albedo, surface.Metallic);
+        surface.IOR = F0toIOR(surface.F0);
+               
+        return surface; 
+    }  
+#endif
+  
+    static Surface make(float3 position, float2 texCoord, float3 normalWS, float3 tangentWS, float3 bitangentWS, float4 vertexColor, float4 landBlend0, float4 landBlend1, Mesh mesh)
+    { 
+        Surface surface;         
+
+        surface.Position = position;
+        surface.SubsurfaceData = (Subsurface)0;
+        surface.DiffTrans = 0.0f;
+        surface.SpecTrans = 0.0f;
+
+        Material material = mesh.Material;
+
+        float2 texCoord0 = material.TexCoord(texCoord);
+
+        surface.FaceNormal = normalWS;
+
+        surface.MipLevel = 0;
+
+        surface.GeomNormal = normalWS;
+        surface.GeomTangent = tangentWS;
+
+        surface.Albedo = float3(1.0f, 1.0f, 1.0f);
+        surface.Emissive = float3(0.0f, 0.0f, 0.0f);
+        surface.TransmissionColor = float3(0.0f, 0.0f, 0.0f);
+        surface.Roughness = PBR::Defaults::Roughness;
+        surface.Metallic = PBR::Defaults::Metallic;
+        
+        surface.AO = 1.0f;
+        surface.F0 = PBR::Defaults::F0;
+    
+#   if defined(SKYRIM)
+        if (material.Feature == Feature::kMultiTexLandLODBlend)
+            LandMaterial(surface, texCoord0, vertexColor, normalWS, tangentWS, bitangentWS, landBlend0, landBlend1, material);
+        else
+            DefaultMaterial(surface, texCoord0, vertexColor, normalWS, tangentWS, bitangentWS, material);
 #   else   
 #   endif
    
@@ -103,8 +161,7 @@ struct SurfaceMaker
         
         
         return surface; 
-    }  
-#endif
+    }    
     
     static Surface make(float3 position, float3 geomNormal, float3 normal, float3 tangent, float3 bitangent, float3 albedo, float roughness, float metallic, float3 emissive, float ao) 
     { 

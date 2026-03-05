@@ -56,6 +56,8 @@ class Renderer
 	uint2 m_RenderSize;
 	uint2 m_PendingRenderSize;
 
+	float2 m_DynamicResolutionRatio;
+
 	eastl::unique_ptr<RenderGraph> m_RenderGraph;
 
 	nvrhi::TimerQueryHandle m_FrameTimer;
@@ -131,8 +133,6 @@ public:
 		return std::clamp(static_cast<uint>(t), 0u, 30u);
 	}
 
-	uint2 GetRenderSize() const { return m_RenderSize; }
-
 	void Load();
 
 	void PostPostLoad();
@@ -153,6 +153,8 @@ public:
 	void SettingsChanged(const Settings& settings);
 
 	uint2 GetResolution();
+
+	uint2 GetDynamicResolution();
 
 	void CheckResolutionResources();
 

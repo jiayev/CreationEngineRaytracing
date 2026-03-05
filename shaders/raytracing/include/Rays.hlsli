@@ -143,7 +143,7 @@ Payload TraceRayStandard(RaytracingAccelerationStructure scene, RayDesc ray, ino
     payload.randomSeed = randomSeed;
 
 #if USE_RAY_QUERY
-    RayQuery<RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
+    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
     rayQuery.TraceRayInline(scene, RAY_FLAG_NONE, 0xFF, ray);
 
     while (rayQuery.Proceed())
@@ -170,7 +170,7 @@ Payload TraceRayStandard(RaytracingAccelerationStructure scene, RayDesc ray, ino
         payload.PackInstanceGeometryIndex(rayQuery.CommittedInstanceIndex(), rayQuery.CommittedGeometryIndex());
     }
 #else // !USE_RAY_QUERY    
-    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES, 0xFF, DIFFUSE_RAY_HITGROUP_IDX, 0, DIFFUSE_RAY_MISS_IDX, ray, payload);
+    TraceRay(Scene, RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES, 0xFF, DIFFUSE_RAY_HITGROUP_IDX, 0, DIFFUSE_RAY_MISS_IDX, ray, payload);
  #endif
     
     randomSeed = payload.randomSeed;
