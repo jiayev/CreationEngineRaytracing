@@ -7,15 +7,16 @@
 #include "Renderer.h"
 
 #include "Renderer/RenderNode.h"
-#include "Passes/RaytracingPass.h"
+#include "Pass/RaytracingPass.h"
 
-#include "Passes/RaytracingCommon.h"
-#include "Passes/RaytracedGI.h"
-#include "Passes/GIComposite.h"
-#include "Passes/PathTracing.h"
-#include "Passes/LightTLAS.h"
-#include "Passes/SHaRC.h"
-#include "Passes/Raster/GBuffer.h"
+#include "Pass/Raytracing/Common/SceneTLAS.h"
+#include "Pass/Raytracing/Common/LightTLAS.h"
+#include "Pass/Raytracing/Common/SHaRC.h"
+
+#include "Pass/RaytracedGI.h"
+#include "Pass/GIComposite.h"
+#include "Pass/Raytracing/PathTracing.h"
+#include "Pass/Raster/GBuffer.h"
 
 Scene::Scene()
 {
@@ -89,7 +90,7 @@ bool Scene::Initialize(RendererParams rendererParams) {
 		m_PathTracing->AddNode({
 			true,
 			"RaytracingCommon",
-			eastl::make_unique<Pass::RaytracingCommon>(renderer)
+			eastl::make_unique<Pass::SceneTLAS>(renderer)
 			});
 
 		m_PathTracing->AddNode({
@@ -103,7 +104,7 @@ bool Scene::Initialize(RendererParams rendererParams) {
 			"SHaRC",
 			eastl::make_unique<Pass::SHaRC>(
 				renderer,
-				m_PathTracing->GetPass<Pass::RaytracingCommon>(),
+				m_PathTracing->GetPass<Pass::SceneTLAS>(),
 				m_PathTracing->GetPass<Pass::LightTLAS>())
 			});
 
@@ -112,7 +113,7 @@ bool Scene::Initialize(RendererParams rendererParams) {
 			"PathTracing",
 			eastl::make_unique<Pass::PathTracing>(
 				renderer,
-				m_PathTracing->GetPass<Pass::RaytracingCommon>(),
+				m_PathTracing->GetPass<Pass::SceneTLAS>(),
 				m_PathTracing->GetPass<Pass::LightTLAS>(),
 				m_PathTracing->GetPass<Pass::SHaRC>())
 			}

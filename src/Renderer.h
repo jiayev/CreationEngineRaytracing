@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Passes/RenderPass.h"
+#include "Pass/RenderPass.h"
 #include "Util.h"
 #include "CameraData.hlsli"
 #include "Types/RendererParams.h"
@@ -77,6 +77,14 @@ class Renderer
 	spdlog::level::level_enum logLevel = spdlog::level::info;
 
 public:
+	struct GBufferOutput
+	{
+		nvrhi::TextureHandle depth;
+		nvrhi::TextureHandle motionVectors;
+		nvrhi::TextureHandle albedo;
+		nvrhi::TextureHandle normalRoughness;
+		nvrhi::TextureHandle emissiveMetallic;
+	} m_GBufferOutput;
 
 	struct RendererSettings
 	{
@@ -133,6 +141,8 @@ public:
 		return std::clamp(static_cast<uint>(t), 0u, 30u);
 	}
 
+	auto& GetGBufferOutput() const { return m_GBufferOutput; }
+
 	void Load();
 
 	void PostPostLoad();
@@ -148,6 +158,8 @@ public:
 
 	void InitRenderPasses();
 
+	void InitializeGBuffer();
+
 	void SetResolution(uint2 resolution);
 
 	void SettingsChanged(const Settings& settings);
@@ -157,6 +169,7 @@ public:
 	uint2 GetDynamicResolution();
 
 	void CheckResolutionResources();
+
 
 	void SetCopyTarget(ID3D12Resource* target);
 

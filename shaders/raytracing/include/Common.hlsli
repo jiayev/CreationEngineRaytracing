@@ -32,7 +32,7 @@
 #define MIN_DIFFUSE_SHADOW (0.0001f)
 #define MIN_RADIANCE (0.01f)
 
-RayDesc SetupPrimaryRay(uint2 idx, uint2 size, CameraData camera)
+float3 GetView(uint2 idx, uint2 size, float4x4 projInverse)
 {
     const float2 uv = float2(idx + 0.5f) / size;
     
@@ -40,17 +40,35 @@ RayDesc SetupPrimaryRay(uint2 idx, uint2 size, CameraData camera)
     screenPos.y = -screenPos.y;
 
     const float4 clip = float4(screenPos, 1.0f, 1.0f);
-    float4 view = mul(camera.ProjInverse, clip);
-    view /= view.w;
+    float4 viewDirection = mul(projInverse, clip);
+   
+    return viewDirection / viewDirection.w;
+}
 
+RayDesc SetupPrimaryRay(float3 viewDirection, CameraData camera)
+{
     RayDesc ray;
     ray.Origin = camera.Position.xyz;
-    ray.Direction = normalize(mul((float3x3)camera.ViewInverse, view.xyz));
+    ray.Direction = normalize(mul((float3x3)camera.ViewInverse, viewDirection.xyz));
     ray.TMin = 0.1f;
     ray.TMax = 1e30;
     
     return ray;
 }
+
+RayDesc SetupPrimaryRay(uint2 idx, uint2 size, CameraData camera)
+{
+    float3 viewDirection = GetView(idx, size, camera.ProjInverse);
+
+    RayDesc ray;
+    ray.Origin = camera.Position.xyz;
+    ray.Direction = normalize(mul((float3x3)camera.ViewInverse, viewDirection.xyz));
+    ray.TMin = 0.1f;
+    ray.TMax = 1e30;
+    
+    return ray;
+}
+
 
 uint InitRandomSeed(uint2 coord, uint2 size, uint frameCount)
 {

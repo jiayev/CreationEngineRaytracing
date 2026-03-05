@@ -2,11 +2,13 @@
 #include "Renderer.h"
 #include "Scene.h"
 
-namespace Pass
+namespace Pass::Raster
 {
 	GBuffer::GBuffer(Renderer* renderer)
 		: RenderPass(renderer)
 	{
+		renderer->InitializeGBuffer();
+
 		m_RaytracingData = eastl::make_unique<RaytracingData>();
 
 		m_RaytracingBuffer = renderer->GetDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
@@ -53,11 +55,6 @@ namespace Pass
 
 	void GBuffer::ResolutionChanged([[maybe_unused]] uint2 resolution)
 	{
-		m_AlbedoTexture = nullptr;
-		m_NormalRoughnessTexture = nullptr;
-		m_EmissiveMetallicTexture = nullptr;
-		m_DepthTexture = nullptr;
-
 		m_FrameBuffer = nullptr;
 		m_GraphicsPipeline = nullptr;
 	}
@@ -72,58 +69,15 @@ namespace Pass
 
 		if (!m_FrameBuffer)
 		{
-			
-			auto device = renderer->GetDevice();
-
-			nvrhi::TextureDesc desc;
-			desc.width = resolution.x;
-			desc.height = resolution.y;
-			desc.initialState = nvrhi::ResourceStates::RenderTarget;
-			desc.isRenderTarget = true;
-			desc.useClearValue = true;
-			desc.clearValue = nvrhi::Color(0.f);
-			desc.keepInitialState = true;
-			desc.isTypeless = false;
-			desc.isUAV = false;
-			desc.mipLevels = 1;
-
-			desc.format = nvrhi::Format::RGBA16_FLOAT;
-			desc.debugName = "GBuffer Albedo";
-			m_AlbedoTexture = device->createTexture(desc);
-
-			desc.format = nvrhi::Format::R10G10B10A2_UNORM;
-			desc.debugName = "GBuffer Normal/Roughness";
-			m_NormalRoughnessTexture = device->createTexture(desc);
-
-			desc.format = nvrhi::Format::RGBA16_FLOAT;
-			desc.debugName = "GBuffer Emissive/Metallic";
-			m_EmissiveMetallicTexture = device->createTexture(desc);
-
-			const nvrhi::Format depthFormats[] = {
-				nvrhi::Format::D24S8,
-				nvrhi::Format::D32S8,
-				nvrhi::Format::D32,
-				nvrhi::Format::D16 };
-
-			const nvrhi::FormatSupport depthFeatures =
-				nvrhi::FormatSupport::Texture |
-				nvrhi::FormatSupport::DepthStencil |
-				nvrhi::FormatSupport::ShaderLoad;
-
-			desc.format = nvrhi::utils::ChooseFormat(device, depthFeatures, depthFormats, std::size(depthFormats));
-			desc.isTypeless = true;
-			desc.initialState = nvrhi::ResourceStates::DepthWrite;
-			desc.clearValue = nvrhi::Color(1.f);
-			desc.debugName = "GBuffer Depth Texture";
-			m_DepthTexture = device->createTexture(desc);
+			auto& gBufferOutput = renderer->GetGBufferOutput();
 
 			auto frameBufferDesc = nvrhi::FramebufferDesc()
-				.addColorAttachment(m_AlbedoTexture)
-				.addColorAttachment(m_NormalRoughnessTexture)
-				.addColorAttachment(m_EmissiveMetallicTexture)
-				.setDepthAttachment(m_DepthTexture);
+				.addColorAttachment(gBufferOutput.albedo)
+				.addColorAttachment(gBufferOutput.normalRoughness)
+				.addColorAttachment(gBufferOutput.emissiveMetallic)
+				.setDepthAttachment(gBufferOutput.depth);
 
-			m_FrameBuffer = device->createFramebuffer(frameBufferDesc);
+			m_FrameBuffer = renderer->GetDevice()->createFramebuffer(frameBufferDesc);
 		}
 
 		const auto& fbinfo = m_FrameBuffer->getFramebufferInfo();
@@ -200,8 +154,5 @@ namespace Pass
 				commandList->draw(args);
 			}
 		}
-
-		auto region = nvrhi::TextureSlice{ 0, 0, 0, resolution.x, resolution.y, 1 };
-		commandList->copyTexture(GetRenderer()->GetMainTexture(), region, m_AlbedoTexture, region);
 	}
 }

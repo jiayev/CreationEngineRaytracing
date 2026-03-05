@@ -1,10 +1,10 @@
-#include "RaytracingCommon.h"
+#include "SceneTLAS.h"
 #include "Renderer.h"
 #include "Scene.h"
 
 namespace Pass
 {
-	RaytracingCommon::RaytracingCommon(Renderer* renderer)
+	SceneTLAS::SceneTLAS(Renderer* renderer)
 		: RenderPass(renderer)
 	{
 		m_RaytracingData = eastl::make_unique<RaytracingData>();
@@ -13,7 +13,7 @@ namespace Pass
 			sizeof(RaytracingData), "Raytracing Data", Constants::MAX_CB_VERSIONS));
 	}
 
-	void RaytracingCommon::UpdateAccelStructs(nvrhi::ICommandList* commandList)
+	void SceneTLAS::UpdateAccelStructs(nvrhi::ICommandList* commandList)
 	{
 		auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
 		auto& instances = sceneGraph->GetInstances();
@@ -52,17 +52,17 @@ namespace Pass
 		commandList->endMarker();
 	}
 
-	nvrhi::IBuffer* RaytracingCommon::GetRaytracingBuffer()
+	nvrhi::IBuffer* SceneTLAS::GetRaytracingBuffer()
 	{
 		return m_RaytracingBuffer;
 	}
 
-	nvrhi::rt::IAccelStruct* RaytracingCommon::GetTopLevelAS()
+	nvrhi::rt::IAccelStruct* SceneTLAS::GetTopLevelAS()
 	{
 		return m_TopLevelAS;
 	}
 
-	void RaytracingCommon::Execute(nvrhi::ICommandList* commandList)
+	void SceneTLAS::Execute(nvrhi::ICommandList* commandList)
 	{
 		auto* scene = Scene::GetSingleton();
 		auto* sceneGraph = scene->GetSceneGraph();

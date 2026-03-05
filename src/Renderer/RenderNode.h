@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Passes/RenderPass.h"
+#include "Pass/RenderPass.h"
 
 class RenderNode
 {

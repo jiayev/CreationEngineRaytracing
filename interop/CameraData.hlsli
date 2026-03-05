@@ -16,7 +16,6 @@ INTEROP_STRUCT(CameraData, 16)
     float3 PositionPrev;
     uint Pad1;
     float4x4 ViewProj;
-    
 };
 VALIDATE_CBUFFER(CameraData, 16);
 

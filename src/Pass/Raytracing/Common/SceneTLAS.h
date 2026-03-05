@@ -2,7 +2,7 @@
 
 #include <PCH.h>
 
-#include "RenderPass.h"
+#include "Pass/RenderPass.h"
 #include "CameraData.hlsli"
 #include "RaytracingData.hlsli"
 #include "ShaderUtils.h"
@@ -11,7 +11,7 @@
 
 namespace Pass
 {
-	class RaytracingCommon : public RenderPass
+	class SceneTLAS : public RenderPass
 	{
 		eastl::unique_ptr<RaytracingData> m_RaytracingData;
 		nvrhi::BufferHandle m_RaytracingBuffer;
@@ -22,7 +22,7 @@ namespace Pass
 
 		uint32_t m_TopLevelInstances = 0;
 	public:
-		RaytracingCommon(Renderer* renderer);
+		SceneTLAS(Renderer* renderer);
 
 		void UpdateAccelStructs(nvrhi::ICommandList* commandList);
 

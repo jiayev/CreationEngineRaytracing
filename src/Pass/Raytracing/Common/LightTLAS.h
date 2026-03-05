@@ -2,7 +2,7 @@
 
 #include <PCH.h>
 
-#include "RenderPass.h"
+#include "Pass/RenderPass.h"
 #include "CameraData.hlsli"
 #include "RaytracingData.hlsli"
 #include "ShaderUtils.h"

@@ -2,15 +2,15 @@
 
 #include <PCH.h>
 
-#include "Passes/RenderPass.h"
+#include "Pass/RenderPass.h"
 #include "CameraData.hlsli"
 #include "RaytracingData.hlsli"
 #include "ShaderUtils.h"
 #include "framework/DescriptorTableManager.h"
 #include "Util.h"
 
-#include "Passes/RaytracingCommon.h"
-#include "Passes/LightTLAS.h"
+#include "Pass/Raytracing/Common/SceneTLAS.h"
+#include "Pass/Raytracing/Common/LightTLAS.h"
 
 #include "Interop/SHaRCData.hlsli"
 
@@ -43,12 +43,12 @@ namespace Pass
 		nvrhi::BufferHandle m_AccumulationBuffer;
 		nvrhi::BufferHandle m_ResolveBuffer;
 
-		RaytracingCommon* m_RaytracingCommon;
+		SceneTLAS* m_SceneTLAS;
 		LightTLAS* m_LightTLAS;
 
 		bool m_DirtyBindings = true;
 	public:
-		SHaRC(Renderer* renderer, RaytracingCommon* raytracingCommon, LightTLAS* lightTLAS);
+		SHaRC(Renderer* renderer, SceneTLAS* sceneTLAS, LightTLAS* lightTLAS);
 
 		auto GetSHaRCConstantBuffer() { return m_SHaRCBuffer; }
 		auto GetHashEntriesBuffer() { return m_HashEntriesBuffer; }

@@ -2,14 +2,14 @@
 
 #include <PCH.h>
 
-#include "Passes/RenderPass.h"
+#include "Pass/RenderPass.h"
 #include "CameraData.hlsli"
 #include "RaytracingData.hlsli"
 #include "ShaderUtils.h"
 #include "framework/DescriptorTableManager.h"
 #include "Util.h"
 
-namespace Pass
+namespace Pass::Raster
 {
 	class GBuffer : public RenderPass
 	{
@@ -22,12 +22,6 @@ namespace Pass
 		nvrhi::BindingSetHandle m_BindingSet;
 
 		nvrhi::SamplerHandle m_LinearWrapSampler;
-
-
-		nvrhi::TextureHandle m_AlbedoTexture;
-		nvrhi::TextureHandle m_NormalRoughnessTexture;
-		nvrhi::TextureHandle m_EmissiveMetallicTexture;
-		nvrhi::TextureHandle m_DepthTexture;
 
 		nvrhi::FramebufferHandle m_FrameBuffer;
 

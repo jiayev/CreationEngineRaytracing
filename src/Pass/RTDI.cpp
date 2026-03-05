@@ -4,8 +4,8 @@
 
 namespace Pass
 {
-	RTDI::RTDI(Renderer* renderer, RaytracingCommon* raytracingCommon)
-		: RenderPass(renderer), m_RaytracingCommon(raytracingCommon)
+	RTDI::RTDI(Renderer* renderer, SceneTLAS* sceneTLAS)
+		: RenderPass(renderer), m_SceneTLAS(sceneTLAS)
 	{
 		m_LinearWrapSampler = GetRenderer()->GetDevice()->createSampler(
 			nvrhi::SamplerDesc()
@@ -156,9 +156,9 @@ namespace Pass
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, scene->GetCameraBuffer()),
-			nvrhi::BindingSetItem::ConstantBuffer(1, m_RaytracingCommon->GetRaytracingBuffer()),
+			nvrhi::BindingSetItem::ConstantBuffer(1, m_SceneTLAS->GetRaytracingBuffer()),
 			nvrhi::BindingSetItem::ConstantBuffer(2, scene->GetFeatureBuffer()),
-			nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_RaytracingCommon->GetTopLevelAS()),
+			nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_SceneTLAS->GetTopLevelAS()),
 			nvrhi::BindingSetItem::Texture_SRV(1, scene->GetSkyHemiTexture()),
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(2, sceneGraph->GetLightBuffer()),
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(3, sceneGraph->GetInstanceBuffer()),

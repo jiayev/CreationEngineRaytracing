@@ -2,19 +2,19 @@
 
 #include <PCH.h>
 
-#include "RenderPass.h"
+#include "Pass/RenderPass.h"
 #include "CameraData.hlsli"
 #include "ShaderUtils.h"
 #include "framework/DescriptorTableManager.h"
 #include "Util.h"
 
-#include "RaytracingCommon.h"
-#include "LightTLAS.h"
-#include "SHaRC.h"
+#include "Pass/Raytracing/Common/SceneTLAS.h"
+#include "Pass/Raytracing/Common/LightTLAS.h"
+#include "Pass/Raytracing/Common/SHaRC.h"
 
-namespace Pass
+namespace Pass::Raytracing
 {
-	class PathTracing : public RenderPass
+	class GBuffer : public RenderPass
 	{
 		nvrhi::ShaderLibraryHandle m_ShaderLibrary;
 		nvrhi::rt::PipelineHandle m_RayPipeline;
@@ -27,18 +27,25 @@ namespace Pass
 
 		nvrhi::SamplerHandle m_LinearWrapSampler;
 
-		RaytracingCommon* m_RaytracingCommon;
+		SceneTLAS* m_SceneTLAS;
 		LightTLAS* m_LightTLAS;
-		SHaRC* m_SHaRC;
 
 		bool m_DirtyBindings = true;
+
+		struct RayReconstructionInputs
+		{
+			nvrhi::TextureHandle diffuseAlbedoTexture;
+			nvrhi::TextureHandle specularAlbedoTexture;
+			nvrhi::TextureHandle normalRoughnessTexture;
+			nvrhi::TextureHandle specularHitDistTexture;
+		};
 
 		/*ResourceHandle m_DirectInput;
 		ResourceHandle m_DiffuseOutput;
 		ResourceHandle m_SpecularOutput;*/
 
 	public:
-		PathTracing(Renderer* renderer, RaytracingCommon* raytracingCommon, LightTLAS* lightTLAS, SHaRC* sharc);
+		GBuffer(Renderer* renderer, SceneTLAS* m_SceneTLAS);
 
 		virtual void CreatePipeline() override;
 

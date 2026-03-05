@@ -8,11 +8,11 @@
 #include "framework/DescriptorTableManager.h"
 #include "Util.h"
 
-#include "RaytracingCommon.h"
+#include "Pass/Raytracing/Common/SceneTLAS.h"
 
 namespace Pass
 {
-	class RaytracedGI : public RenderPass
+	class RTDI : public RenderPass
 	{
 		nvrhi::ShaderLibraryHandle m_ShaderLibrary;
 		nvrhi::rt::PipelineHandle m_RayPipeline;
@@ -25,16 +25,11 @@ namespace Pass
 
 		nvrhi::SamplerHandle m_LinearWrapSampler;
 
-		RaytracingCommon* m_RaytracingCommon;
+		SceneTLAS* m_SceneTLAS;
 
 		bool m_DirtyBindings = true;
-
-		/*ResourceHandle m_DirectInput;
-		ResourceHandle m_DiffuseOutput;
-		ResourceHandle m_SpecularOutput;*/
-
 	public:
-		RaytracedGI(Renderer* renderer, RaytracingCommon* raytracingCommon);
+		RTDI(Renderer* renderer, SceneTLAS* sceneTLAS);
 
 		virtual void CreatePipeline() override;
 

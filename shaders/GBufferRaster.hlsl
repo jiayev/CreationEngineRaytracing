@@ -87,7 +87,7 @@ struct PixelOut
 {
 	float4 Albedo           : SV_TARGET0;
  	float4 NormalRoughness  : SV_TARGET1;
- 	float4 EmissiveMetallic : SV_TARGET2;        
+ 	float4 EmissiveMetallic : SV_TARGET2;
 };
 
 PixelOut MainPS(in VertexOut i)
