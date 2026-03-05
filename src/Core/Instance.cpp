@@ -42,6 +42,8 @@ void Instance::Update()
 
 	// Update transform for BLAS instance
 	XMStoreFloat3x4(&m_Transform, Util::Math::GetXMFromNiTransform(node->world));
+	XMStoreFloat3x4(&m_PrevTransform, Util::Math::GetXMFromNiTransform(node->previousWorld));
+
 	m_NiTransform = node->world;
 
 	// Instance has already been updated this frame

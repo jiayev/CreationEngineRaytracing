@@ -15,6 +15,7 @@
 
 #include "Pass/RaytracedGI.h"
 #include "Pass/GIComposite.h"
+#include "Pass/Raytracing/GBuffer.h"
 #include "Pass/Raytracing/PathTracing.h"
 #include "Pass/Raster/GBuffer.h"
 
@@ -84,7 +85,7 @@ bool Scene::Initialize(RendererParams rendererParams) {
 		);
 	}*/
 
-	{
+	/*{
 		m_PathTracing = eastl::make_unique<RenderNode>(true, "Path Tracing");
 
 		m_PathTracing->AddNode({
@@ -118,9 +119,28 @@ bool Scene::Initialize(RendererParams rendererParams) {
 				m_PathTracing->GetPass<Pass::SHaRC>())
 			}
 		);
-	}
+	}*/
 
 	//m_GBuffer = eastl::make_unique<RenderNode>(true, "GBuffer", eastl::make_unique<Pass::GBuffer>(renderer));
+
+	{
+		m_PathTracing = eastl::make_unique<RenderNode>(true, "Path Tracing");
+
+		m_PathTracing->AddNode({
+			true,
+			"RaytracingCommon",
+			eastl::make_unique<Pass::SceneTLAS>(renderer)
+		});
+
+		m_PathTracing->AddNode({
+			true,
+			"RTGBuffer",
+			eastl::make_unique<Pass::Raytracing::GBuffer>(
+				renderer,
+				m_PathTracing->GetPass<Pass::SceneTLAS>()
+			)
+		});
+	}
 
 	renderer->GetRenderGraph()->AttachRootNode(m_PathTracing.get());
 
@@ -224,6 +244,8 @@ void Scene::UpdateCameraData() const
 	float2 ndcToViewMult = float2(2.0f / cameraData.projMat(0, 0), -2.0f / cameraData.projMat(1, 1));
 	float2 ndcToViewAdd = float2(-1.0f / cameraData.projMat(0, 0), 1.0f / cameraData.projMat(1, 1));
 
+	m_CameraData->PrevViewInverse = m_CameraData->ViewInverse;
+
 	m_CameraData->ViewInverse = cameraData.viewMat.Invert();
 	m_CameraData->ProjInverse = cameraData.projMat.Invert();
 	m_CameraData->CameraData = Util::Game::GetClippingData();
@@ -238,6 +260,7 @@ void Scene::UpdateCameraData() const
 	m_CameraData->PositionPrev = Util::Math::Float3(runtimeData.previousPosAdjust.getEye());
 
 	m_CameraData->ViewProj = cameraData.viewProjMatrixUnjittered;
+	m_CameraData->PrevViewProj = cameraData.previousViewProjMatrixUnjittered;
 }
 
 void Scene::UpdateFeatureData(void* data, uint32_t size)

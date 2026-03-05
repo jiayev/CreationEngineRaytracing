@@ -76,15 +76,19 @@ class Renderer
 
 	spdlog::level::level_enum logLevel = spdlog::level::info;
 
+	void InitGBuffer();
+
 public:
 	struct GBufferOutput
 	{
-		nvrhi::TextureHandle depth;
-		nvrhi::TextureHandle motionVectors;
-		nvrhi::TextureHandle albedo;
-		nvrhi::TextureHandle normalRoughness;
-		nvrhi::TextureHandle emissiveMetallic;
-	} m_GBufferOutput;
+		nvrhi::TextureHandle depth = nullptr;
+		nvrhi::TextureHandle motionVectors = nullptr;
+		nvrhi::TextureHandle albedo = nullptr;
+		nvrhi::TextureHandle normalRoughness = nullptr;
+		nvrhi::TextureHandle emissiveMetallic = nullptr;
+	};
+
+	eastl::unique_ptr<GBufferOutput> m_GBufferOutput;
 
 	struct RendererSettings
 	{
@@ -141,7 +145,12 @@ public:
 		return std::clamp(static_cast<uint>(t), 0u, 30u);
 	}
 
-	auto& GetGBufferOutput() const { return m_GBufferOutput; }
+	auto GetGBufferOutput() { 
+		if (!m_GBufferOutput)
+			InitGBuffer();
+
+		return m_GBufferOutput.get();
+	}
 
 	void Load();
 
@@ -157,8 +166,6 @@ public:
 	void InitDefaultTextures();
 
 	void InitRenderPasses();
-
-	void InitializeGBuffer();
 
 	void SetResolution(uint2 resolution);
 

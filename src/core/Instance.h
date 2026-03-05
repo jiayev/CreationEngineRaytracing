@@ -29,6 +29,7 @@ struct Instance
 
 	// Used for BLAS instance
 	float3x4 m_Transform;
+	float3x4 m_PrevTransform;
 
 	// Makes sure we only update once per frame
 	uint64_t m_LastUpdate = 0;

@@ -159,9 +159,11 @@ void Renderer::InitRenderPasses()
 	m_CommandList->open();
 }
 
-void Renderer::InitializeGBuffer()
+void Renderer::InitGBuffer()
 {
-	auto device = GetDevice();
+	m_GBufferOutput = eastl::make_unique<GBufferOutput>();
+
+	auto& device = m_NVRHIDevice;
 
 	nvrhi::TextureDesc desc;
 	desc.width = m_RenderSize.x;
@@ -172,24 +174,24 @@ void Renderer::InitializeGBuffer()
 	desc.clearValue = nvrhi::Color(0.f);
 	desc.keepInitialState = true;
 	desc.isTypeless = false;
-	desc.isUAV = false;
+	desc.isUAV = true;
 	desc.mipLevels = 1;
 
 	desc.format = nvrhi::Format::R11G11B10_FLOAT;
 	desc.debugName = "GBuffer Motion Vectors";
-	m_GBufferOutput.motionVectors = device->createTexture(desc);
+	m_GBufferOutput->motionVectors = device->createTexture(desc);
 
 	desc.format = nvrhi::Format::RGBA16_FLOAT;
 	desc.debugName = "GBuffer Albedo";
-	m_GBufferOutput.albedo = device->createTexture(desc);
+	m_GBufferOutput->albedo = device->createTexture(desc);
 
 	desc.format = nvrhi::Format::R10G10B10A2_UNORM;
 	desc.debugName = "GBuffer Normal/Roughness";
-	m_GBufferOutput.normalRoughness = device->createTexture(desc);
+	m_GBufferOutput->normalRoughness = device->createTexture(desc);
 
 	desc.format = nvrhi::Format::RGBA16_FLOAT;
 	desc.debugName = "GBuffer Emissive/Metallic";
-	m_GBufferOutput.emissiveMetallic = device->createTexture(desc);
+	m_GBufferOutput->emissiveMetallic = device->createTexture(desc);
 
 	const nvrhi::Format depthFormats[] = {
 		nvrhi::Format::D24S8,
@@ -203,11 +205,12 @@ void Renderer::InitializeGBuffer()
 		nvrhi::FormatSupport::ShaderLoad;
 
 	desc.format = nvrhi::utils::ChooseFormat(device, depthFeatures, depthFormats, std::size(depthFormats));
+	desc.isUAV = false;
 	desc.isTypeless = true;
 	desc.initialState = nvrhi::ResourceStates::DepthWrite;
 	desc.clearValue = nvrhi::Color(1.f);
 	desc.debugName = "GBuffer Depth Texture";
-	m_GBufferOutput.depth = device->createTexture(desc);
+	m_GBufferOutput->depth = device->createTexture(desc);
 }
 
 void Renderer::SetResolution(uint2 resolution)

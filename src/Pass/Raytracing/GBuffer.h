@@ -28,9 +28,10 @@ namespace Pass::Raytracing
 		nvrhi::SamplerHandle m_LinearWrapSampler;
 
 		SceneTLAS* m_SceneTLAS;
-		LightTLAS* m_LightTLAS;
 
 		bool m_DirtyBindings = true;
+
+		nvrhi::TextureHandle m_ViewDepth;
 
 		struct RayReconstructionInputs
 		{

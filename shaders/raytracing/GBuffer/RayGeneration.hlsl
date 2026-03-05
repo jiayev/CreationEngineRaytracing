@@ -18,12 +18,9 @@
 #include "include/Surface.hlsli"
 #include "include/SurfaceMaker.hlsli"
 
-#include "include/Lighting.hlsli"
+#include "raytracing/include/Rays.hlsli"
 
 #include "raytracing/include/Transparency.hlsli"
-
-#include "Raytracing/Include/SHARC/Sharc.hlsli"
-#include "Raytracing/Include/SHARC/SHaRCHelper.hlsli"
 
 #if defined(GROUP_TILING)
 #   define DXC_STATIC_DISPATCH_GRID_DIM 1
@@ -62,8 +59,6 @@ void Main()
     
     RayDesc ray = SetupPrimaryRay(viewDir, Camera);
     
-    const float3 direction = ray.Direction;
-    
     uint randomSeed = InitRandomSeed(idx, size, Camera.FrameIndex);
     
 #if DEBUG_TRACE_HEATMAP       
@@ -89,7 +84,7 @@ void Main()
     if (!payload.Hit())
     {
         Depth[idx] = 0.0f;
-        MotionVectors[idx] = float2(0.0f, 0.0f);       
+        MotionVectors[idx] = float3(0.0f, 0.0f, 0.0f);       
         Albedo[idx] = float4(0.0f, 0.0f, 0.0f, 0.0f);   
         NormalRoughness[idx] = float4(0.0f, 0.0f, 0.0f, 0.0f);   
         EmissiveMetallic[idx] = float4(0.0f, 0.0f, 0.0f, 0.0f);   
@@ -97,23 +92,29 @@ void Main()
           
     RayCone rayCone = RayCone::make(Raytracing.PixelConeSpreadAngle * payload.hitDistance, Raytracing.PixelConeSpreadAngle);   
     
-    float3 position = Camera.Position.xyz + direction * payload.hitDistance;
+    float3 worldPosition = ray.Origin + ray.Direction * payload.hitDistance;
     
     Instance instance;
     Material material;
 
-    Surface surface = SurfaceMaker::make(position, payload, direction, rayCone, instance, material);
+    Surface surface = SurfaceMaker::make(worldPosition, payload, ray.Direction, rayCone, instance, material);
+
+    float3 viewPos = viewDir * payload.hitDistance;    
     
-    float3 viewPos = viewDir * payload.hitDistance;
+    float4 currClip = mul(float4(worldPosition,1), Camera.ViewProj);
     
-    float3 prevViewDir = GetView(idx, size, Camera.ProjInverse);
+    float prevHitDistance = Depth[idx] / viewDir.z;
+    float3 preViewPos = viewDir * prevHitDistance;
+    float4 prevWorldPosition = mul(Camera.PrevViewInverse, float4(preViewPos, 1.0f));
+    float4 prevClip = mul(prevWorldPosition, Camera.PrevViewProj);
+
+    float3 currNDC = currClip.xyz / currClip.w;
+    float3 prevNDC = prevClip.xyz / prevClip.w;
+
+    float3 motion = currNDC.xyz - prevNDC.xyz;
     
-    float prevHitDistance = Depth[idx] / prevViewDir.y;
-    
-    float3 preViewPos = prevViewDir * prevHitDistance;
-    
-    Depth[idx] = viewPos.y;
-    MotionVectors[idx] = (preViewPos.xyz - viewPos.xyz) * float3(0.5f * Camera.RenderSize.x, -0.5f * Camera.RenderSize.y, 1.0f);    
+    Depth[idx] = viewPos.z;
+    MotionVectors[idx] = motion * float3(0.5f * Camera.RenderSize.x, -0.5f * Camera.RenderSize.y, 1.0f);    
     Albedo[idx] = float4(surface.Albedo, 1.0f);   
     NormalRoughness[idx] = float4(surface.Normal * 0.5f + 0.5f, surface.Roughness);   
     EmissiveMetallic[idx] = float4(surface.Emissive, surface.Metallic);      

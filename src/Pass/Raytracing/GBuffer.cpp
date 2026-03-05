@@ -7,8 +7,6 @@ namespace Pass::Raytracing
 	GBuffer::GBuffer(Renderer* renderer, SceneTLAS* sceneTLAS)
 		: RenderPass(renderer), m_SceneTLAS(sceneTLAS)
 	{
-		renderer->InitializeGBuffer();
-
 		m_LinearWrapSampler = GetRenderer()->GetDevice()->createSampler(
 			nvrhi::SamplerDesc()
 			.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap)
@@ -181,7 +179,25 @@ namespace Pass::Raytracing
 
 		auto* sceneGraph = scene->GetSceneGraph();
 
-		auto& gBufferOutput = renderer->GetGBufferOutput();
+		auto* gBufferOutput = renderer->GetGBufferOutput();
+
+		if (!m_ViewDepth)
+		{
+			auto resolution = renderer->GetResolution();
+
+			nvrhi::TextureDesc desc;
+			desc.width = resolution.x;
+			desc.height = resolution.y;
+			desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+			desc.keepInitialState = true;
+			desc.isTypeless = false;
+			desc.isUAV = true;
+			desc.mipLevels = 1;
+			desc.format = nvrhi::Format::R32_FLOAT;
+			desc.debugName = "RTGBuffer Viewspace Depth";
+
+			m_ViewDepth = renderer->GetDevice()->createTexture(desc);
+		}
 
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
@@ -192,11 +208,11 @@ namespace Pass::Raytracing
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(1, sceneGraph->GetInstanceBuffer()),
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(2, sceneGraph->GetMeshBuffer()),
 			nvrhi::BindingSetItem::Sampler(0, m_LinearWrapSampler),
-			nvrhi::BindingSetItem::Texture_UAV(0, gBufferOutput.depth),
-			nvrhi::BindingSetItem::Texture_UAV(1, gBufferOutput.motionVectors),
-			nvrhi::BindingSetItem::Texture_UAV(2, gBufferOutput.albedo),
-			nvrhi::BindingSetItem::Texture_UAV(3, gBufferOutput.normalRoughness),
-			nvrhi::BindingSetItem::Texture_UAV(4, gBufferOutput.emissiveMetallic)
+			nvrhi::BindingSetItem::Texture_UAV(0, m_ViewDepth),
+			nvrhi::BindingSetItem::Texture_UAV(1, gBufferOutput->motionVectors),
+			nvrhi::BindingSetItem::Texture_UAV(2, gBufferOutput->albedo),
+			nvrhi::BindingSetItem::Texture_UAV(3, gBufferOutput->normalRoughness),
+			nvrhi::BindingSetItem::Texture_UAV(4, gBufferOutput->emissiveMetallic)
 		};
 
 		
@@ -219,8 +235,7 @@ namespace Pass::Raytracing
 			m_BindingSet,
 			sceneGraph->GetTriangleDescriptors()->m_DescriptorTable->GetDescriptorTable(),
 			sceneGraph->GetVertexDescriptors()->m_DescriptorTable->GetDescriptorTable(),
-			sceneGraph->GetTextureDescriptors()->m_DescriptorTable->GetDescriptorTable(),
-			m_LightTLAS->GetLightDescriptorTable()
+			sceneGraph->GetTextureDescriptors()->m_DescriptorTable->GetDescriptorTable()
 		};
 
 		auto resolution = Renderer::GetSingleton()->GetDynamicResolution();
@@ -248,7 +263,7 @@ namespace Pass::Raytracing
 			commandList->dispatch(threadGroupSize.x, threadGroupSize.y);
 		}
 
-		auto region = nvrhi::TextureSlice{ 0, 0, 0, resolution.x, resolution.y, 1 };
-		commandList->copyTexture(GetRenderer()->GetMainTexture(), region, GetRenderer()->GetGBufferOutput().motionVectors, region);
+		//auto region = nvrhi::TextureSlice{ 0, 0, 0, resolution.x, resolution.y, 1 };
+		//commandList->copyTexture(GetRenderer()->GetMainTexture(), region, GetRenderer()->GetGBufferOutput()->motionVectors, region);
 	}
 }

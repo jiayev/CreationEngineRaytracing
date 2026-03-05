@@ -7,8 +7,6 @@ namespace Pass::Raster
 	GBuffer::GBuffer(Renderer* renderer)
 		: RenderPass(renderer)
 	{
-		renderer->InitializeGBuffer();
-
 		m_RaytracingData = eastl::make_unique<RaytracingData>();
 
 		m_RaytracingBuffer = renderer->GetDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
@@ -69,13 +67,13 @@ namespace Pass::Raster
 
 		if (!m_FrameBuffer)
 		{
-			auto& gBufferOutput = renderer->GetGBufferOutput();
+			auto* gBufferOutput = renderer->GetGBufferOutput();
 
 			auto frameBufferDesc = nvrhi::FramebufferDesc()
-				.addColorAttachment(gBufferOutput.albedo)
-				.addColorAttachment(gBufferOutput.normalRoughness)
-				.addColorAttachment(gBufferOutput.emissiveMetallic)
-				.setDepthAttachment(gBufferOutput.depth);
+				.addColorAttachment(gBufferOutput->albedo)
+				.addColorAttachment(gBufferOutput->normalRoughness)
+				.addColorAttachment(gBufferOutput->emissiveMetallic)
+				.setDepthAttachment(gBufferOutput->depth);
 
 			m_FrameBuffer = renderer->GetDevice()->createFramebuffer(frameBufferDesc);
 		}
