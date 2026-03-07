@@ -33,18 +33,6 @@ namespace Pass::Raytracing
 
 		nvrhi::TextureHandle m_ViewDepth;
 
-		struct RayReconstructionInputs
-		{
-			nvrhi::TextureHandle diffuseAlbedoTexture;
-			nvrhi::TextureHandle specularAlbedoTexture;
-			nvrhi::TextureHandle normalRoughnessTexture;
-			nvrhi::TextureHandle specularHitDistTexture;
-		};
-
-		/*ResourceHandle m_DirectInput;
-		ResourceHandle m_DiffuseOutput;
-		ResourceHandle m_SpecularOutput;*/
-
 	public:
 		GBuffer(Renderer* renderer, SceneTLAS* m_SceneTLAS);
 

@@ -114,49 +114,7 @@ void Renderer::InitDefaultTextures()
 	commandList->commitBarriers();
 
 	commandList->close();
-	m_NVRHIDevice->executeCommandList(commandList);
-}
-
-void Renderer::InitRenderPasses()
-{
-	/*auto main = m_FrameGraph.createTexture(nvrhi::TextureDesc()
-		.setWidth(m_RenderSize.x)
-		.setHeight(m_RenderSize.y)
-		.setIsUAV(true)
-		.setFormat(nvrhi::Format::RGBA16_FLOAT)
-		.setInitialState(nvrhi::ResourceStates::UnorderedAccess)
-		.setDebugName("Main Texture")
-	);
-
-	auto lighting = m_FrameGraph.createTexture({ ... });
-
-	m_FrameGraph.addPass("Raytracing", 
-		[&](PassBuilder& builder)
-		{
-			builder.read(gbuffer);
-			builder.write(lighting);
-		},
-		[&](PassResources& resources)
-		{
-			auto gbufferTex = resources.getTexture(gbuffer);
-			auto lightingTex = resources.getTexture(lighting);
-		});*/
-
-	/*auto main = m_FrameGraph.createTexture(nvrhi::TextureDesc()
-		.setWidth(m_RenderSize.x)
-		.setHeight(m_RenderSize.y)
-		.setIsUAV(true)
-		.setFormat(nvrhi::Format::RGBA16_FLOAT)
-		.setInitialState(nvrhi::ResourceStates::UnorderedAccess)
-		.setDebugName("Main Texture")
-	);
-
-	// Temporarily set up a single raytracing pass, more passes will be added later and in a more dynamic way
-	m_RenderPasses.emplace_back(eastl::make_unique<RaytracingPass>(this, m_FrameGraph));*/
-
-	m_CommandList = m_NVRHIDevice->createCommandList();
-
-	m_CommandList->open();
+	GetDevice()->executeCommandList(commandList);
 }
 
 void Renderer::InitGBuffer()
@@ -213,9 +171,59 @@ void Renderer::InitGBuffer()
 	m_GBufferOutput->depth = device->createTexture(desc);
 }
 
+
+void Renderer::InitRR()
+{
+	m_RayReconstructionInput = eastl::make_unique<RayReconstructionInput>();
+
+	auto& device = m_NVRHIDevice;
+
+	nvrhi::TextureDesc desc;
+	desc.width = m_RenderSize.x;
+	desc.height = m_RenderSize.y;
+	desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+	desc.keepInitialState = true;
+	desc.isUAV = true;
+	desc.mipLevels = 1;
+
+	desc.format = nvrhi::Format::R11G11B10_FLOAT;
+	desc.debugName = "RR Diffuse Albedo";
+	m_RayReconstructionInput->diffuseAlbedo = device->createTexture(desc);
+
+	desc.format = nvrhi::Format::R11G11B10_FLOAT;
+	desc.debugName = "RR Specular Albedo";
+	m_RayReconstructionInput->specularAlbedo = device->createTexture(desc);
+
+	desc.format = nvrhi::Format::RGBA8_SNORM;
+	desc.debugName = "RR Normal Roughness";
+	m_RayReconstructionInput->normalRoughness = device->createTexture(desc);
+
+	desc.format = nvrhi::Format::R32_FLOAT;
+	desc.debugName = "RR Specular Hit Distance";
+	m_RayReconstructionInput->specularHitDistance = device->createTexture(desc);
+}
+
 void Renderer::SetResolution(uint2 resolution)
 {
-	m_PendingRenderSize = resolution;
+	if (m_RenderSize == resolution)
+		return;
+
+	m_RenderSize = resolution;
+
+	{
+		nvrhi::TextureDesc desc;
+		desc.width = m_RenderSize.x;
+		desc.height = m_RenderSize.y;
+		desc.isUAV = true;
+		desc.keepInitialState = true;
+		desc.format = nvrhi::Format::RGBA16_FLOAT;
+		desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+		desc.debugName = "Main Texture";
+
+		m_MainTexture = m_NVRHIDevice->createTexture(desc);
+	}
+
+	m_RenderGraph->ResolutionChanged(m_RenderSize);
 
 	logger::info("Resolution set to {}x{}", resolution.x, resolution.y);
 }
@@ -231,30 +239,6 @@ uint2 Renderer::GetDynamicResolution()
 		static_cast<uint32_t>(m_RenderSize.x * m_DynamicResolutionRatio.x),  
 		static_cast<uint32_t>(m_RenderSize.y * m_DynamicResolutionRatio.y)
 	};
-}
-
-void Renderer::CheckResolutionResources()
-{
-	if (m_RenderSize == m_PendingRenderSize)
-		return;
-
-	m_RenderSize = m_PendingRenderSize;
-
-	// Output Texture
-	{
-		nvrhi::TextureDesc desc;
-		desc.width = m_RenderSize.x;
-		desc.height = m_RenderSize.y;
-		desc.isUAV = true;
-		desc.keepInitialState = true;
-		desc.format = nvrhi::Format::RGBA16_FLOAT;
-		desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-		desc.debugName = "Main Texture";
-
-		m_MainTexture = m_NVRHIDevice->createTexture(desc);
-	}
-
-	m_RenderGraph->ResolutionChanged(m_RenderSize);
 }
 
 void Renderer::SettingsChanged(const Settings& settings)
@@ -287,41 +271,37 @@ void Renderer::SetCopyTarget(ID3D12Resource* target)
 
 void Renderer::ExecutePasses()
 {
-	CheckResolutionResources();
-
 	auto& stateRuntime = RE::BSGraphics::State::GetSingleton()->GetRuntimeData();
 
 	m_DynamicResolutionRatio = { stateRuntime.dynamicResolutionWidthRatio, stateRuntime.dynamicResolutionHeightRatio };
 
-	// Get current command list
-	auto commandList = GetCommandList();
+	// Create a command list
+	if (!m_CommandList)
+		m_CommandList = GetDevice()->createCommandList();
 
-	commandList->beginTimerQuery(m_FrameTimer);
+	m_CommandList->open();
 
-	logger::trace("Renderer::ExecutePasses - Frame {}", m_FrameIndex);
+	m_CommandList->beginTimerQuery(m_FrameTimer);
 
-	Scene::GetSingleton()->Update(commandList);
+	Scene::GetSingleton()->Update(m_CommandList);
 
-	m_RenderGraph->Execute(commandList);
+	m_RenderGraph->Execute(m_CommandList);
 
 	Scene::GetSingleton()->ClearDirtyStates();
 
 	if (m_CopyTargetTexture) 
 	{
 		auto region = nvrhi::TextureSlice{ 0, 0, 0, m_RenderSize.x, m_RenderSize.y, 1 };
-		commandList->copyTexture(m_CopyTargetTexture, region, m_MainTexture, region);
+		m_CommandList->copyTexture(m_CopyTargetTexture, region, m_MainTexture, region);
 	}
 
-	commandList->endTimerQuery(m_FrameTimer);
+	m_CommandList->endTimerQuery(m_FrameTimer);
 
 	// Close it
-	commandList->close();
+	m_CommandList->close();
 
 	// Execute it
-	m_LastSubmittedInstance = m_NVRHIDevice->executeCommandList(commandList, nvrhi::CommandQueue::Graphics);
-
-	// Open it again, NVRHI handles multiple command lists internally (or so they say)
-	commandList->open();
+	m_LastSubmittedInstance = GetDevice()->executeCommandList(m_CommandList, nvrhi::CommandQueue::Graphics);
 }
 
 void Renderer::WaitExecution()
@@ -329,15 +309,15 @@ void Renderer::WaitExecution()
 	// Wait for the last submitted command list to finish execution before proceeding
 	//m_NVRHIDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, m_LastSubmittedInstance);
 
-	m_NVRHIDevice->waitForIdle();
+	GetDevice()->waitForIdle();
 
-	if (m_NVRHIDevice->pollTimerQuery(m_FrameTimer))
+	if (GetDevice()->pollTimerQuery(m_FrameTimer))
 		m_FrameTime = m_NVRHIDevice->getTimerQueryTime(m_FrameTimer) * 1000.0f;
 
 	m_FrameIndex++;
 
 	// Run garbage collection to release resources that are no longer in use
-	m_NVRHIDevice->runGarbageCollection();
+	GetDevice()->runGarbageCollection();
 }
 
 void Renderer::Load()

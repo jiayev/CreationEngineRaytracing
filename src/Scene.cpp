@@ -58,9 +58,6 @@ bool Scene::Initialize(RendererParams rendererParams) {
 
 	renderer->InitDefaultTextures();
 
-	// We split render pass initialization from renderer because of the global descriptors
-	renderer->InitRenderPasses();
-
 	// Camera Data
 	m_CameraData = eastl::make_unique<CameraData>();
 	m_CameraBuffer = renderer->GetDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
@@ -85,7 +82,7 @@ bool Scene::Initialize(RendererParams rendererParams) {
 		);
 	}*/
 
-	/*{
+	{
 		m_PathTracing = eastl::make_unique<RenderNode>(true, "Path Tracing");
 
 		m_PathTracing->AddNode({
@@ -119,11 +116,11 @@ bool Scene::Initialize(RendererParams rendererParams) {
 				m_PathTracing->GetPass<Pass::SHaRC>())
 			}
 		);
-	}*/
+	}
 
 	//m_GBuffer = eastl::make_unique<RenderNode>(true, "GBuffer", eastl::make_unique<Pass::GBuffer>(renderer));
 
-	{
+	/*{
 		m_PathTracing = eastl::make_unique<RenderNode>(true, "Path Tracing");
 
 		m_PathTracing->AddNode({
@@ -140,7 +137,7 @@ bool Scene::Initialize(RendererParams rendererParams) {
 				m_PathTracing->GetPass<Pass::SceneTLAS>()
 			)
 		});
-	}
+	}*/
 
 	renderer->GetRenderGraph()->AttachRootNode(m_PathTracing.get());
 

@@ -6,6 +6,8 @@
 
 #include "include/Surface.hlsli"
 
+#include "include/Utils/VanillaToPBR.hlsli"
+
 #define LIGHTINGSETTINGS Raytracing
 #define HAIRSETTINGS Features.HairSpecular
 
@@ -116,17 +118,23 @@ void DefaultMaterial(inout Surface surface, in float2 texCoord0, in float4 verte
                 Texture2D normalTexture = Textures[NonUniformResourceIndex(material.NormalTexture())];
                 specularColor *= normalTexture.SampleLevel(DefaultSampler, texCoord0, mipLevel).a;
             }
-                
-#if defined(EXP_VANILLA_PBR_METAL)
+    
+#if defined(EXP_VANILLA_PBR_METAL) || defined(EXP_VANILLA_PBR_ROUGHNESS)
 	        float specularity = CalcSpecularity(specularColor, material.SpecularColor().a);            
-	        float roughnessFromShininess = material.RoughnessScale();
-                
+	        float roughnessFromShininess = material.RoughnessScale();            
+#endif
+            
+#if defined(EXP_VANILLA_PBR_METAL)               
             Metallic = CalcMetallic(Albedo, specularity, roughnessFromShininess);
 #endif
-
+            
+#if defined(EXP_VANILLA_PBR_ROUGHNESS)
+            surface.Roughness =  CalcRoughness(roughnessFromShininess, specularity);
+            surface.F0 = clamp(0.08f * specularColor, 0.02f, 0.08f);           
+#else
             surface.Roughness = material.RoughnessScale();
-                
-            surface.F0 = clamp(0.08f * specularColor * material.SpecularColor().a, 0.02f, 0.08f);
+            surface.F0 = clamp(0.08f * specularColor * material.SpecularColor().a, 0.02f, 0.08f);            
+#endif       
         }
          
         [branch]

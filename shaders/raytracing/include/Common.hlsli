@@ -51,7 +51,7 @@ RayDesc SetupPrimaryRay(float3 viewDirection, CameraData camera)
     ray.Origin = camera.Position.xyz;
     ray.Direction = normalize(mul((float3x3)camera.ViewInverse, viewDirection.xyz));
     ray.TMin = 0.1f;
-    ray.TMax = 1e30;
+    ray.TMax = RAY_TMAX;
     
     return ray;
 }
@@ -64,7 +64,7 @@ RayDesc SetupPrimaryRay(uint2 idx, uint2 size, CameraData camera)
     ray.Origin = camera.Position.xyz;
     ray.Direction = normalize(mul((float3x3)camera.ViewInverse, viewDirection.xyz));
     ray.TMin = 0.1f;
-    ray.TMax = 1e30;
+    ray.TMax = RAY_TMAX;
     
     return ray;
 }

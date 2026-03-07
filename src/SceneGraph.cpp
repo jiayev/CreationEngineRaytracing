@@ -579,8 +579,33 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 			if (modelPtr->ShouldQueueMSNConversion())
 				m_MSNConvertionQueue.emplace_back(modelName);
 
-			modelPtr->CreateBuffers(this, Renderer::GetSingleton()->GetCommandList());
-			modelPtr->BuildBLAS(Renderer::GetSingleton()->GetCommandList());
+			// Copy Command
+			auto* copyCommandList = Renderer::GetSingleton()->GetCopyCommandList();
+			copyCommandList->open();
+			copyCommandList->setEnableAutomaticBarriers(false);
+
+			modelPtr->CreateBuffers(this, copyCommandList);
+
+			copyCommandList->setEnableAutomaticBarriers(true);
+			copyCommandList->close();
+
+			auto device = Renderer::GetSingleton()->GetDevice();
+
+			auto copySubmittedInstance = device->executeCommandList(copyCommandList, nvrhi::CommandQueue::Copy);
+
+			// Compute Command
+			auto* computeCommandList = Renderer::GetSingleton()->GetComputeCommandList();
+			computeCommandList->open();
+			computeCommandList->setEnableAutomaticBarriers(false);
+
+			modelPtr->BuildBLAS(computeCommandList);
+
+			computeCommandList->setEnableAutomaticBarriers(true);
+			computeCommandList->close();
+
+			device->queueWaitForCommandList(nvrhi::CommandQueue::Compute, nvrhi::CommandQueue::Copy, copySubmittedInstance);
+
+			device->executeCommandList(computeCommandList, nvrhi::CommandQueue::Compute);
 
 			AddInstance(formID, pRoot, modelName);
 

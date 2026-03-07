@@ -15,4 +15,5 @@ extern "C" {
 	CERT_API void SetSkyHemisphere(ID3D12Resource* skyHemi);
 	CERT_API float* GetFrameTime();
 	CERT_API void UpdateSettings(Settings);
+	CERT_API void GetRRInput(ID3D12Resource*& diffuseAlbedo, ID3D12Resource*& specularAlbedo, ID3D12Resource*& normalRoughness, ID3D12Resource*& specularHitDistance);
 }

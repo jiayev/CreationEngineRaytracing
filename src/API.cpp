@@ -68,3 +68,22 @@ void UpdateSettings(Settings settings)
 	auto* scene = Scene::GetSingleton();
 	scene->UpdateSettings(settings);
 }
+
+void GetRRInput(ID3D12Resource*& diffuseAlbedo, ID3D12Resource*& specularAlbedo, ID3D12Resource*& normalRoughness, ID3D12Resource*& specularHitDistance)
+{
+	auto* rrInput = Renderer::GetSingleton()->GetRRInput();
+
+	if (rrInput) {
+		diffuseAlbedo = rrInput->diffuseAlbedo->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+		specularAlbedo = rrInput->specularAlbedo->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+		normalRoughness = rrInput->normalRoughness->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+		specularHitDistance = rrInput->specularHitDistance->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+	}
+	else
+	{
+		diffuseAlbedo = nullptr;
+		specularAlbedo = nullptr;
+		normalRoughness = nullptr;
+		specularHitDistance = nullptr;
+	}
+}

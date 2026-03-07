@@ -108,6 +108,10 @@ void Main()
     {
 #if !(defined(SHARC) && SHARC_UPDATE)
         Output[idx] = float4(0.0f, 0.0f, 0.0f, 0.0f);
+        DiffuseAlbedo[idx] = float3(0.0f, 0.0f, 0.0f);   
+        SpecularAlbedo[idx] = float3(0.5f, 0.5f, 0.5f);    
+        NormalRoughness[idx] = float4(0.0f, 0.0f, 0.0f, 1.0f);
+        SpecularHitDistance[idx] = RAY_TMAX;            
 #endif     
         return;
     }
@@ -129,6 +133,13 @@ void Main()
     StandardBSDF sourceBSDF = StandardBSDF::make(sourceSurface, true);    
     
     AdjustShadingNormal(sourceSurface, sourceBRDFContext, true, false);    
+    
+ #if !(defined(SHARC) && SHARC_UPDATE)
+    DiffuseAlbedo[idx] = sourceSurface.DiffuseAlbedo;   
+    const float2 envBRDF = BRDF::EnvBRDF(sourceSurface.Roughness, sourceBRDFContext.NdotV);
+    SpecularAlbedo[idx] = float3(sourceSurface.F0 * envBRDF.x + envBRDF.y);
+    NormalRoughness[idx] = float4(sourceSurface.Normal, sourceSurface.Roughness);   
+#endif       
     
     bool isSssPath = false;
     
@@ -398,5 +409,6 @@ void Main()
 
 #if !(defined(SHARC) && SHARC_UPDATE)
     Output[idx] = float4(LLTrueLinearToGamma(direct + radiance), 1.0f);
+    SpecularHitDistance[idx] = specHitDist;     
 #endif    
 }

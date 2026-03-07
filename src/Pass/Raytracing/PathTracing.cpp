@@ -33,7 +33,8 @@ namespace Pass
 			{ L"SHARC_UPDATE", L"0" },
 			{ L"SHARC_RESOLVE", L"0" },
 			{ L"SHARC_DEBUG", L"0" },
-			{ L"DEBUG_TRACE_HEATMAP", L"0" }			
+			{ L"DEBUG_TRACE_HEATMAP", L"0" },
+			{ L"EXP_VANILLA_PBR_ROUGHNESS", L"1" }
 		};
 
 		if (GetRenderer()->m_Settings.UseRayQuery)
@@ -70,8 +71,11 @@ namespace Pass
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(5),
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(6),
 			nvrhi::BindingLayoutItem::Sampler(0),
-			nvrhi::BindingLayoutItem::Texture_UAV(0)
-			
+			nvrhi::BindingLayoutItem::Texture_UAV(0),
+			nvrhi::BindingLayoutItem::Texture_UAV(1),
+			nvrhi::BindingLayoutItem::Texture_UAV(2),
+			nvrhi::BindingLayoutItem::Texture_UAV(3),
+			nvrhi::BindingLayoutItem::Texture_UAV(4)
 		};
 
 #if defined(NVAPI)
@@ -190,6 +194,8 @@ namespace Pass
 
 		auto* sceneGraph = scene->GetSceneGraph();
 
+		auto* rrInput = renderer->GetRRInput();
+
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, scene->GetCameraBuffer()),
@@ -204,7 +210,11 @@ namespace Pass
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_SHaRC->GetResolveBuffer()),
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(6, m_SHaRC->GetHashEntriesBuffer()),
 			nvrhi::BindingSetItem::Sampler(0, m_LinearWrapSampler),
-			nvrhi::BindingSetItem::Texture_UAV(0, renderer->GetMainTexture())			
+			nvrhi::BindingSetItem::Texture_UAV(0, renderer->GetMainTexture()),
+			nvrhi::BindingSetItem::Texture_UAV(1, rrInput->diffuseAlbedo),
+			nvrhi::BindingSetItem::Texture_UAV(2, rrInput->specularAlbedo),
+			nvrhi::BindingSetItem::Texture_UAV(3, rrInput->normalRoughness),
+			nvrhi::BindingSetItem::Texture_UAV(4, rrInput->specularHitDistance)
 		};
 
 		

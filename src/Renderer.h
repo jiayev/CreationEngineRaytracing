@@ -42,7 +42,9 @@ class Renderer
 
 	nvrhi::DeviceHandle m_NVRHIDevice;
 
-	nvrhi::CommandListHandle m_CommandList;
+	nvrhi::CommandListHandle m_CommandList = nullptr;
+	nvrhi::CommandListHandle m_ComputeCommandList = nullptr;
+	nvrhi::CommandListHandle m_CopyCommandList = nullptr;
 
 	uint64_t m_LastSubmittedInstance = 0;
 
@@ -77,6 +79,7 @@ class Renderer
 	spdlog::level::level_enum logLevel = spdlog::level::info;
 
 	void InitGBuffer();
+	void InitRR();
 
 public:
 	struct GBufferOutput
@@ -89,6 +92,16 @@ public:
 	};
 
 	eastl::unique_ptr<GBufferOutput> m_GBufferOutput;
+
+	struct RayReconstructionInput
+	{
+		nvrhi::TextureHandle diffuseAlbedo = nullptr;
+		nvrhi::TextureHandle specularAlbedo = nullptr;
+		nvrhi::TextureHandle normalRoughness = nullptr;
+		nvrhi::TextureHandle specularHitDistance = nullptr;
+	};
+
+	eastl::unique_ptr<RayReconstructionInput> m_RayReconstructionInput;
 
 	struct RendererSettings
 	{
@@ -109,8 +122,29 @@ public:
 
 	static auto GetNativeD3D12Device() { return GetSingleton()->m_NativeD3D12Device; }
 
-	nvrhi::ICommandList* GetCommandList() const { return m_CommandList; }
+	nvrhi::ICommandList* GetComputeCommandList() {
+		if (!m_ComputeCommandList)
+			m_ComputeCommandList = GetDevice()->createCommandList(
+				nvrhi::CommandListParameters()
+				.setQueueType(nvrhi::CommandQueue::Compute)
+				.setEnableImmediateExecution(false) // Enables usage in other threads
+			);
 
+		return m_ComputeCommandList;
+	}
+
+	nvrhi::ICommandList* GetCopyCommandList() {
+		if (!m_CopyCommandList)
+			m_CopyCommandList = GetDevice()->createCommandList(
+				nvrhi::CommandListParameters()
+				.setQueueType(nvrhi::CommandQueue::Copy)
+				.setEnableImmediateExecution(false) // Enables usage in other threads
+			);
+
+		return m_CopyCommandList;
+	}
+	//nvrhi::ICommandList* GetCommandList() const { return m_CommandList; }
+	
 	RenderGraph* GetRenderGraph() { return m_RenderGraph.get(); }
 
 	inline auto GetMainTexture() { return m_MainTexture; }
@@ -152,6 +186,13 @@ public:
 		return m_GBufferOutput.get();
 	}
 
+	auto GetRRInput() {
+		if (!m_RayReconstructionInput)
+			InitRR();
+
+		return m_RayReconstructionInput.get();
+	}
+
 	void Load();
 
 	void PostPostLoad();
@@ -165,8 +206,6 @@ public:
 
 	void InitDefaultTextures();
 
-	void InitRenderPasses();
-
 	void SetResolution(uint2 resolution);
 
 	void SettingsChanged(const Settings& settings);
@@ -174,9 +213,6 @@ public:
 	uint2 GetResolution();
 
 	uint2 GetDynamicResolution();
-
-	void CheckResolutionResources();
-
 
 	void SetCopyTarget(ID3D12Resource* target);
 
