@@ -68,6 +68,12 @@ void SetSkyHemisphere(ID3D12Resource* skyHemi)
 	scene->SetSkyHemisphere(skyHemi);
 }
 
+void SetPhysicalSkyTrLUT(ID3D12Resource* trLut)
+{
+	auto* scene = Scene::GetSingleton();
+	scene->SetPhysicalSkyTrLUT(trLut);
+}
+
 float* GetFrameTime()
 {
 	return Renderer::GetSingleton()->GetFrameTime();

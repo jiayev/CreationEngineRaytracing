@@ -353,6 +353,36 @@ void Scene::SetSkyHemisphere(ID3D12Resource* skyHemi)
 	m_SkyHemisphereTexture = renderer->GetDevice()->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D12_Resource, skyHemi, desc);
 }
 
+void Scene::SetPhysicalSkyTrLUT(ID3D12Resource* trLut)
+{
+	if (trLut == m_PhysicalSkyTrLUTResource)
+		return;
+
+	m_PhysicalSkyTrLUTResource = trLut;
+
+	if (!trLut) {
+		m_PhysicalSkyTrLUTTexture = nullptr;
+		return;
+	}
+
+	auto* renderer = Renderer::GetSingleton();
+
+	auto targetDesc = trLut->GetDesc();
+
+	nvrhi::TextureDesc desc{};
+	desc.width = static_cast<uint32_t>(targetDesc.Width);
+	desc.height = targetDesc.Height;
+	desc.format = renderer->GetFormat(targetDesc.Format);
+	desc.mipLevels = targetDesc.MipLevels;
+	desc.arraySize = targetDesc.DepthOrArraySize;
+	desc.dimension = nvrhi::TextureDimension::Texture2D;
+	desc.initialState = nvrhi::ResourceStates::ShaderResource;
+	desc.keepInitialState = true;
+	desc.debugName = "Physical Sky TrLUT Texture";
+
+	m_PhysicalSkyTrLUTTexture = renderer->GetDevice()->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D12_Resource, trLut, desc);
+}
+
 void Scene::UpdateSettings(Settings settings)
 {
 	auto previousMode = m_Settings.GeneralSettings.Mode;

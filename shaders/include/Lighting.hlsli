@@ -53,6 +53,30 @@ float EvalSkyOcclusion(Texture2D<float4> SkyHemisphere, float3 dir, float opacit
     return lerp(1.0f, 1.0f - SkyHemisphere.SampleLevel(DefaultSampler, uv, 0.0f).a, opacity);
 }
 
+#if defined(PHYSICAL_SKY_TRLUT)
+float3 SamplePhysicalSkyTransmittance(float3 sunDir)
+{
+    if (Features.PhysicalSky.enabled == 0 || Features.PhysicalSky.trMix <= 1e-8f)
+        return 1.0f.xxx;
+
+    static const float cosHorZenith = -0.414f;
+
+    float2 uv = float2(
+        saturate((sunDir.z - cosHorZenith) / (1.0f - cosHorZenith)),
+        saturate((Features.PhysicalSky.zCameraPlanet - Features.PhysicalSky.rPlanet) /
+             max(Features.PhysicalSky.rAtmosphere - Features.PhysicalSky.rPlanet, 1e-6f)));
+
+    uv = clamp(uv, float2(0.5 / 256.0, 0.5 / 64.0), float2(1.0 - 0.5 / 256.0, 1.0 - 0.5 / 64.0));
+
+    float3 tr = PhysicalSkyTrLUT.SampleLevel(DefaultSampler, uv, 0.0f).rgb;
+
+    if (sunDir.z <= cosHorZenith)
+        tr = 0.0f.xxx;
+
+    return lerp(1.0f.xxx, tr, Features.PhysicalSky.trMix);
+}
+#endif
+
 float3 EvalDiffuse(in float3 l, in Surface surface, in BRDFContext brdfContext)
 {
     float NdotL = saturate(dot(surface.Normal, l));
@@ -78,6 +102,10 @@ void GetDirectionalLightIrradiance(out float3 irradiance, out float3 lr, inout u
 {
     irradiance = DirLightToLinear(DIRECTIONAL_LIGHT.Color) * EvalSkyOcclusion(SKY_HEMI, DIRECTIONAL_LIGHT.Vector, Features.CloudShadows.Opacity);
     lr = DIRECTIONAL_LIGHT.Vector;
+
+#if defined(PHYSICAL_SKY_TRLUT)
+    irradiance *= SamplePhysicalSkyTransmittance(lr);
+#endif
 
     // Sun angular radius is ~0.00465 radians (~0.266 degrees)
     float cosSunDisk = cos(0.00465f);

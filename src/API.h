@@ -15,6 +15,7 @@ extern "C" {
 	CERT_API void AttachLand(RE::TESForm* form, RE::NiAVObject* root);
 	CERT_API void UpdateFeatureData(void* data, uint32_t size);
 	CERT_API void SetSkyHemisphere(ID3D12Resource* skyHemi);
+	CERT_API void SetPhysicalSkyTrLUT(ID3D12Resource* trLut);
 	CERT_API float* GetFrameTime();
 	CERT_API void UpdateSettings(Settings);
 	CERT_API void GetRRInput(ID3D12Resource*& specularAlbedo, ID3D12Resource*& specularHitDistance);
