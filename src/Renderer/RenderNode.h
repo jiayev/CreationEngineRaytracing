@@ -1,8 +1,9 @@
 #pragma once
 
 #include "Pass/RenderPass.h"
+#include "Renderer/IRenderNode.h"
 
-class RenderNode
+class RenderNode : public IRenderNode
 {
 	bool m_Enabled = true;
 	eastl::string m_Name;
@@ -59,9 +60,9 @@ public:
 
 	void AddNode(RenderNode renderNode);
 
-	void ResolutionChanged(uint2 resolution);
+	void ResolutionChanged(uint2 resolution) override;
 
-	void SettingsChanged(const Settings& settings);
+	void SettingsChanged(const Settings& settings) override;
 
-	void Execute(nvrhi::ICommandList* commandList);
+	void Execute(nvrhi::ICommandList* commandList) override;
 };

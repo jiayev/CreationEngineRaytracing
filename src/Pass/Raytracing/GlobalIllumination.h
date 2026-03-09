@@ -2,7 +2,7 @@
 
 #include <PCH.h>
 
-#include "RenderPass.h"
+#include "Pass/RenderPass.h"
 #include "CameraData.hlsli"
 #include "ShaderUtils.h"
 #include "framework/DescriptorTableManager.h"
@@ -10,9 +10,9 @@
 
 #include "Pass/Raytracing/Common/SceneTLAS.h"
 
-namespace Pass
+namespace Pass::Raytracing
 {
-	class RaytracedGI : public RenderPass
+	class GlobalIllumination : public RenderPass
 	{
 		nvrhi::ShaderLibraryHandle m_ShaderLibrary;
 		nvrhi::rt::PipelineHandle m_RayPipeline;
@@ -34,7 +34,7 @@ namespace Pass
 		ResourceHandle m_SpecularOutput;*/
 
 	public:
-		RaytracedGI(Renderer* renderer, SceneTLAS* sceneTLAS);
+		GlobalIllumination(Renderer* renderer, SceneTLAS* sceneTLAS);
 
 		virtual void CreatePipeline() override;
 

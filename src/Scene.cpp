@@ -13,7 +13,7 @@
 #include "Pass/Raytracing/Common/LightTLAS.h"
 #include "Pass/Raytracing/Common/SHaRC.h"
 
-#include "Pass/RaytracedGI.h"
+#include "Pass/Raytracing/GlobalIllumination.h"
 #include "Pass/GIComposite.h"
 #include "Pass/Raytracing/GBuffer.h"
 #include "Pass/Raytracing/PathTracing.h"
@@ -44,7 +44,99 @@ SceneGraph* Scene::GetSceneGraph() const
 	return m_SceneGraph.get();
 }
 
-bool Scene::Initialize(RendererParams rendererParams) {
+RenderNode* Scene::GetGlobalIllumination()
+{
+	if (!m_GlobalIllumination) {
+		auto* renderer = Renderer::GetSingleton();
+
+		m_GlobalIllumination = eastl::make_unique<RenderNode>(true, "Global Illumination");
+
+		m_GlobalIllumination->AddNode({
+			true,
+			"SceneTLAS",
+			eastl::make_unique<Pass::SceneTLAS>(renderer)
+			});
+
+		m_GlobalIllumination->AddNode({
+			true,
+			"GlobalIllumination",
+			eastl::make_unique<Pass::Raytracing::GlobalIllumination>(
+				renderer,
+				m_GlobalIllumination->GetPass<Pass::SceneTLAS>())
+			}
+		);
+	}
+
+	return m_GlobalIllumination.get();
+}
+
+RenderNode* Scene::GetPathTracing()
+{
+	if (!m_PathTracing) {
+		auto* renderer = Renderer::GetSingleton();
+
+		m_PathTracing = eastl::make_unique<RenderNode>(true, "Path Tracing");
+
+		m_PathTracing->AddNode({
+			true,
+			"RaytracingCommon",
+			eastl::make_unique<Pass::SceneTLAS>(renderer)
+			});
+
+		m_PathTracing->AddNode({
+			true,
+			"LightTLAS",
+			eastl::make_unique<Pass::LightTLAS>(renderer)
+			});
+
+		m_PathTracing->AddNode({
+			true,
+			"SHaRC",
+			eastl::make_unique<Pass::SHaRC>(
+				renderer,
+				m_PathTracing->GetPass<Pass::SceneTLAS>(),
+				m_PathTracing->GetPass<Pass::LightTLAS>()
+			)
+			});
+
+		m_PathTracing->AddNode({
+			true,
+			"PathTracing",
+			eastl::make_unique<Pass::PathTracing>(
+				renderer,
+				m_PathTracing->GetPass<Pass::SceneTLAS>(),
+				m_PathTracing->GetPass<Pass::LightTLAS>(),
+				m_PathTracing->GetPass<Pass::SHaRC>()
+			)
+			});
+	}
+
+	return m_PathTracing.get();
+}
+
+RenderNode* Scene::GetModeNode(Mode mode)
+{
+	if (mode == Mode::GlobalIllumination)
+		return GetGlobalIllumination();
+	else if (mode == Mode::PathTracing)
+		return GetPathTracing();
+
+	return nullptr;
+}
+
+void Scene::UpdateMode(Mode mode, Mode previousMode)
+{
+	auto* rootNode = Renderer::GetSingleton()->GetRenderGraph()->GetRootNode();
+
+	// Detach previous mode node
+	rootNode->DetachRenderNode(GetModeNode(previousMode));
+
+	// Attach new mode node
+	rootNode->AttachRenderNode(GetModeNode(mode));
+}
+
+bool Scene::Initialize(RendererParams rendererParams) 
+{
 	auto* renderer = Renderer::GetSingleton();
 
 	// Initialize renderer
@@ -68,55 +160,6 @@ bool Scene::Initialize(RendererParams rendererParams) {
 	m_FeatureBuffer = renderer->GetDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
 		sizeof(FeatureData), "Feature Data", Constants::MAX_CB_VERSIONS));
 
-	// Raytracing passes require a 'RaytracingCommon' pass to create and manage the TLAS
-	/*{
-		m_GlobalIllumination = eastl::make_unique<RenderNode>(true, "Global Illumination", eastl::make_unique<Pass::RaytracingCommon>(renderer));
-
-		m_GlobalIllumination->AddNode({
-			true,
-			"RaytracedGI",
-			eastl::make_unique<Pass::RaytracedGI>(
-				renderer,
-				m_GlobalIllumination->GetPass<Pass::RaytracingCommon>())
-			}
-		);
-	}*/
-
-	{
-		m_PathTracing = eastl::make_unique<RenderNode>(true, "Path Tracing");
-
-		m_PathTracing->AddNode({
-			true,
-			"RaytracingCommon",
-			eastl::make_unique<Pass::SceneTLAS>(renderer)
-			});
-
-		m_PathTracing->AddNode({
-			true,
-			"LightTLAS",
-			eastl::make_unique<Pass::LightTLAS>(renderer)
-		});
-
-		m_PathTracing->AddNode({
-			true,
-			"SHaRC",
-			eastl::make_unique<Pass::SHaRC>(
-				renderer,
-				m_PathTracing->GetPass<Pass::SceneTLAS>(),
-				m_PathTracing->GetPass<Pass::LightTLAS>())
-			});
-
-		m_PathTracing->AddNode({
-			true,
-			"PathTracing",
-			eastl::make_unique<Pass::PathTracing>(
-				renderer,
-				m_PathTracing->GetPass<Pass::SceneTLAS>(),
-				m_PathTracing->GetPass<Pass::LightTLAS>(),
-				m_PathTracing->GetPass<Pass::SHaRC>())
-			}
-		);
-	}
 
 	//m_GBuffer = eastl::make_unique<RenderNode>(true, "GBuffer", eastl::make_unique<Pass::GBuffer>(renderer));
 
@@ -138,8 +181,6 @@ bool Scene::Initialize(RendererParams rendererParams) {
 			)
 		});
 	}*/
-
-	renderer->GetRenderGraph()->AttachRootNode(m_PathTracing.get());
 
 	return true;
 }
@@ -302,5 +343,12 @@ void Scene::SetSkyHemisphere(ID3D12Resource* skyHemi)
 
 void Scene::UpdateSettings(Settings settings)
 {
+	auto previousMode = m_Settings.GeneralSettings.Mode;
+
 	m_Settings = settings;
+
+	auto currentMode = settings.GeneralSettings.Mode;
+
+	if (currentMode != previousMode)
+		UpdateMode(currentMode, previousMode);
 }

@@ -4,16 +4,8 @@
 RenderGraph::RenderGraph(Renderer* renderer)
 {
 	m_Renderer = renderer;
-}
 
-void RenderGraph::AttachRootNode(RenderNode* rootNode)
-{
-	m_RootNode = rootNode;
-}
-
-void RenderGraph::DetachRootNode()
-{
-	m_RootNode = nullptr;
+	m_RootNode = eastl::make_unique<RootRenderNode>();
 }
 
 void RenderGraph::ResolutionChanged(uint2 resolution)

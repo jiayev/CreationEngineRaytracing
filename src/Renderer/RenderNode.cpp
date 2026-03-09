@@ -13,9 +13,9 @@ void RenderNode::ResolutionChanged(uint2 resolution)
 	if (m_RenderPass)
 		m_RenderPass->ResolutionChanged(resolution);
 
-	for (auto& m_ChildPass : m_Children)
+	for (auto& child : m_Children)
 	{
-		m_ChildPass.ResolutionChanged(resolution);
+		child.ResolutionChanged(resolution);
 	}
 }
 
@@ -27,9 +27,9 @@ void RenderNode::SettingsChanged(const Settings& settings)
 	if (m_RenderPass)
 		m_RenderPass->SettingsChanged(settings);
 
-	for (auto& m_ChildPass : m_Children)
+	for (auto& child : m_Children)
 	{
-		m_ChildPass.SettingsChanged(settings);
+		child.SettingsChanged(settings);
 	}
 }
 
@@ -41,8 +41,8 @@ void RenderNode::Execute(nvrhi::ICommandList* commandList)
 	if (m_RenderPass)
 		m_RenderPass->Execute(commandList);
 
-	for (auto& m_ChildPass : m_Children)
+	for (auto& child : m_Children)
 	{
-		m_ChildPass.Execute(commandList);
+		child.Execute(commandList);
 	}
 }

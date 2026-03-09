@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Renderer/RootRenderNode.h"
 #include "Renderer/RenderNode.h"
 
 class RenderGraph
@@ -7,14 +8,12 @@ class RenderGraph
     Renderer* m_Renderer;
 
     eastl::unordered_map<eastl::string, nvrhi::ResourceHandle> m_Resources;
-    RenderNode* m_RootNode = nullptr;
+    eastl::unique_ptr<RootRenderNode> m_RootNode = nullptr;
 
 public:
     RenderGraph(Renderer* m_Renderer);
 
-    void AttachRootNode(RenderNode* rootNode);
-
-    void DetachRootNode();
+    RootRenderNode* GetRootNode() const { return m_RootNode.get(); }
 
     nvrhi::IResource* GetResource(eastl::string name)
     {

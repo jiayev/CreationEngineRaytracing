@@ -13,6 +13,15 @@ Renderer::Renderer()
 	m_RenderGraph = eastl::make_unique<RenderGraph>(this);
 }
 
+nvrhi::ITexture* Renderer::GetDepthTexture() {
+	if (!m_DepthTexture) {
+		auto& depthStencils = RE::BSGraphics::Renderer::GetSingleton()->GetDepthStencilData().depthStencils;
+		m_DepthTexture = ShareTexture(depthStencils[RE::RENDER_TARGETS_DEPTHSTENCIL::kMAIN].texture, "Depth");
+	}
+
+	return m_DepthTexture;
+}
+
 void Renderer::Initialize(RendererParams rendererParams)
 {
 	Hooks::InstallD3D11Hooks(rendererParams.d3d11Device);
@@ -117,11 +126,11 @@ void Renderer::InitDefaultTextures()
 	GetDevice()->executeCommandList(commandList);
 }
 
-void Renderer::InitGBuffer()
+void Renderer::InitGBufferOutput()
 {
 	m_GBufferOutput = eastl::make_unique<GBufferOutput>();
 
-	auto& device = m_NVRHIDevice;
+	auto device = GetDevice();
 
 	nvrhi::TextureDesc desc;
 	desc.width = m_RenderSize.x;
@@ -171,12 +180,11 @@ void Renderer::InitGBuffer()
 	m_GBufferOutput->depth = device->createTexture(desc);
 }
 
-
 void Renderer::InitRR()
 {
 	m_RayReconstructionInput = eastl::make_unique<RayReconstructionInput>();
 
-	auto& device = m_NVRHIDevice;
+	auto device = GetDevice();
 
 	nvrhi::TextureDesc desc;
 	desc.width = m_RenderSize.x;
@@ -201,6 +209,16 @@ void Renderer::InitRR()
 	desc.format = nvrhi::Format::R32_FLOAT;
 	desc.debugName = "RR Specular Hit Distance";
 	m_RayReconstructionInput->specularHitDistance = device->createTexture(desc);
+}
+
+void Renderer::SetRenderTargets(ID3D12Resource* albedo, ID3D12Resource* normalRoughness, ID3D12Resource* gnmao)
+{
+	if (!m_RenderTargets)
+		m_RenderTargets = eastl::make_unique<RenderTargets>();
+
+	m_RenderTargets->albedo = CreateHandleForNativeTexture(albedo, "Albedo RenderTarget");
+	m_RenderTargets->normalRoughness = CreateHandleForNativeTexture(normalRoughness, "Normal Roughness RenderTarget");
+	m_RenderTargets->gnmao = CreateHandleForNativeTexture(gnmao, "GNMAO RenderTarget");
 }
 
 void Renderer::SetResolution(uint2 resolution)
@@ -333,6 +351,50 @@ void Renderer::PostPostLoad()
 void Renderer::DataLoaded()
 {
 
+}
+
+nvrhi::TextureHandle Renderer::CreateHandleForNativeTexture(ID3D12Resource* nativeResource, const char* debugName)
+{
+	D3D12_RESOURCE_DESC nativeTexDesc = nativeResource->GetDesc();
+
+	auto formatIt = Renderer::GetFormatMapping().find(nativeTexDesc.Format);
+
+	if (formatIt == Renderer::GetFormatMapping().end()) {
+		logger::error("Renderer::ShareTexture - Unmapped format {}", magic_enum::enum_name(nativeTexDesc.Format));
+		return nullptr;
+	}
+
+	auto textureDesc = nvrhi::TextureDesc()
+		.setWidth(static_cast<uint32_t>(nativeTexDesc.Width))
+		.setHeight(nativeTexDesc.Height)
+		.setFormat(formatIt->second)
+		.setInitialState(nvrhi::ResourceStates::ShaderResource)
+		.setDebugName(debugName);
+
+	return GetDevice()->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D12_Resource, nativeResource, textureDesc);
+}
+
+nvrhi::TextureHandle Renderer::ShareTexture(ID3D11Texture2D* d3d11Texture, const char* debugName)
+{
+	D3D11_TEXTURE2D_DESC desc;
+	d3d11Texture->GetDesc(&desc);
+
+	IDXGIResource1* dxgiResource;
+	d3d11Texture->QueryInterface(IID_PPV_ARGS(&dxgiResource));
+
+	HANDLE sharedHandle = nullptr;
+
+	dxgiResource->GetSharedHandle(&sharedHandle);
+
+	auto* nativeDevice = Renderer::GetSingleton()->GetNativeD3D12Device();
+	auto device = Renderer::GetSingleton()->GetDevice();
+
+	ID3D12Resource* d3d12Resource;
+	nativeDevice->OpenSharedHandle(sharedHandle, IID_PPV_ARGS(&d3d12Resource));
+
+	CloseHandle(sharedHandle);
+
+	return CreateHandleForNativeTexture(d3d12Resource, std::format("{} [Shared Texture]", debugName).c_str());
 }
 
 void Renderer::SetLogLevel(spdlog::level::level_enum a_level)

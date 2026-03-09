@@ -21,6 +21,18 @@ namespace Hooks
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
 
+	struct CreateRenderTarget_PlayerFaceGenTint
+	{
+		static void thunk(RE::BSGraphics::Renderer* oThis, RE::RENDER_TARGETS::RENDER_TARGET a_target, RE::BSGraphics::RenderTargetProperties* a_properties);
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
+
+	struct CreateDepthStencil_Main
+	{
+		static void thunk(RE::BSGraphics::Renderer* This, uint32_t a_target, RE::BSGraphics::DepthStencilTargetProperties* a_properties);
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
+
 	struct BSCullingProcess_AppendVirtual
 	{
 		static void thunk(RE::BSCullingProcess* cullingProcess, RE::BSGeometry& geometry, uint32_t a_arg2);

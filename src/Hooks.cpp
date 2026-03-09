@@ -35,6 +35,32 @@ namespace Hooks
 		return result;
 	}
 
+	void CreateRenderTarget_PlayerFaceGenTint::thunk(RE::BSGraphics::Renderer* oThis, RE::RENDER_TARGETS::RENDER_TARGET a_target, RE::BSGraphics::RenderTargetProperties* a_properties)
+	{
+		auto* scene = Scene::GetSingleton();
+
+		std::lock_guard<std::recursive_mutex> lock(scene->shareTextureMutex);
+
+		scene->shareTexture = true;
+
+		func(oThis, a_target, a_properties);
+
+		scene->shareTexture = false;
+	}
+
+	void CreateDepthStencil_Main::thunk(RE::BSGraphics::Renderer* This, uint32_t a_target, RE::BSGraphics::DepthStencilTargetProperties* a_properties)
+	{
+		auto* scene = Scene::GetSingleton();
+
+		std::lock_guard<std::recursive_mutex> lock(scene->shareTextureMutex);
+
+		scene->shareTexture = true;
+
+		func(This, a_target, a_properties);
+
+		scene->shareTexture = false;
+	}
+
 	void BSCullingProcess_AppendVirtual::thunk(RE::BSCullingProcess* cullingProcess, RE::BSGeometry& geometry, uint32_t a_arg2)
 	{
 		if (Scene::GetSingleton()->ApplyPathTracingCull())
@@ -100,6 +126,7 @@ namespace Hooks
 
 		func(shadowSceneNode, light);
 	}
+
 #elif defined(FALLOUT4)
 
 #endif
@@ -127,6 +154,10 @@ namespace Hooks
 #if defined(SKYRIM)
 		stl::detour_thunk<TES_AttachModel>(REL::RelocationID(13209, 13355));
 		stl::detour_thunk<CreateTextureFromDDS>(REL::RelocationID(69334, 70716));
+
+		stl::write_thunk_call<CreateRenderTarget_PlayerFaceGenTint>(REL::RelocationID(100458, 107175).address() + REL::Relocate(0x606, 0x605, 0x0));
+
+		stl::write_thunk_call<CreateDepthStencil_Main>(REL::RelocationID(100458, 107175).address() + REL::Relocate(0x951, 0x951, 0x0));
 
 		stl::detour_thunk<Main_RenderWorld>(REL::RelocationID(100424, 107142));
 

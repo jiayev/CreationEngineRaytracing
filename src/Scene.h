@@ -51,9 +51,17 @@ struct Scene
 
 	inline auto GetFeatureBuffer() const { return m_FeatureBuffer; }
 
-	inline bool ApplyPathTracingCull() const { return m_Settings.Enabled && m_Settings.PathTracing && m_Settings.DebugSettings.PathTracingCull; };
+	inline bool ApplyPathTracingCull() const { return m_Settings.Enabled && m_Settings.GeneralSettings.Mode == Mode::PathTracing && m_Settings.DebugSettings.PathTracingCull; };
 
 	inline nvrhi::ITexture* GetSkyHemiTexture() const { return m_SkyHemisphereTexture; }
+
+	RenderNode* GetGlobalIllumination();
+
+	RenderNode* GetPathTracing();
+
+	RenderNode* GetModeNode(Mode mode);
+
+	void UpdateMode(Mode mode, Mode previousMode);
 
 	bool Initialize(RendererParams rendererParams);
 

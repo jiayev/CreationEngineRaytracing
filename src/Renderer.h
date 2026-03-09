@@ -48,6 +48,7 @@ class Renderer
 
 	uint64_t m_LastSubmittedInstance = 0;
 
+	nvrhi::TextureHandle m_DepthTexture;
 	nvrhi::TextureHandle m_MainTexture;
 
 	ID3D12Resource* m_CopyTargetResource = nullptr;
@@ -78,8 +79,9 @@ class Renderer
 
 	spdlog::level::level_enum logLevel = spdlog::level::info;
 
-	void InitGBuffer();
+	void InitGBufferOutput();
 	void InitRR();
+	void SetRenderTargets(ID3D12Resource*, ID3D12Resource*, ID3D12Resource*);
 
 public:
 	struct GBufferOutput
@@ -91,6 +93,7 @@ public:
 		nvrhi::TextureHandle emissiveMetallic = nullptr;
 	};
 
+	// GBuffer output from raster pass
 	eastl::unique_ptr<GBufferOutput> m_GBufferOutput;
 
 	struct RayReconstructionInput
@@ -101,7 +104,19 @@ public:
 		nvrhi::TextureHandle specularHitDistance = nullptr;
 	};
 
+	// Inputs used by DLSS Ray Reconstruction
 	eastl::unique_ptr<RayReconstructionInput> m_RayReconstructionInput;
+
+	struct RenderTargets
+	{
+		nvrhi::TextureHandle albedo = nullptr;
+#if defined(SKYRIM)
+		nvrhi::TextureHandle normalRoughness = nullptr;
+		nvrhi::TextureHandle gnmao = nullptr;
+#endif
+	};
+
+	eastl::unique_ptr<RenderTargets> m_RenderTargets;
 
 	struct RendererSettings
 	{
@@ -118,7 +133,7 @@ public:
 
 	Renderer();
 
-	auto GetDevice() { return m_NVRHIDevice; }
+	auto GetDevice() const { return m_NVRHIDevice; }
 
 	static auto GetNativeD3D12Device() { return GetSingleton()->m_NativeD3D12Device; }
 
@@ -146,6 +161,8 @@ public:
 	//nvrhi::ICommandList* GetCommandList() const { return m_CommandList; }
 	
 	RenderGraph* GetRenderGraph() { return m_RenderGraph.get(); }
+
+	nvrhi::ITexture* GetDepthTexture();
 
 	inline auto GetMainTexture() { return m_MainTexture; }
 
@@ -181,7 +198,7 @@ public:
 
 	auto GetGBufferOutput() { 
 		if (!m_GBufferOutput)
-			InitGBuffer();
+			InitGBufferOutput();
 
 		return m_GBufferOutput.get();
 	}
@@ -193,11 +210,22 @@ public:
 		return m_RayReconstructionInput.get();
 	}
 
+	auto GetRenderTargets() {
+		if (!m_RenderTargets)
+			m_RenderTargets = eastl::make_unique<RenderTargets>();
+
+		return m_RenderTargets.get();
+	}
+
 	void Load();
 
 	void PostPostLoad();
 
 	void DataLoaded();
+
+	nvrhi::TextureHandle CreateHandleForNativeTexture(ID3D12Resource* d3d11Texture, const char* debugName);
+
+	nvrhi::TextureHandle ShareTexture(ID3D11Texture2D* d3d11Texture, const char* debugName);
 
 	void SetLogLevel(spdlog::level::level_enum a_level = spdlog::level::info);
 	spdlog::level::level_enum GetLogLevel();

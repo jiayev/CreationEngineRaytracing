@@ -1,10 +1,10 @@
-#include "RaytracedGI.h"
+#include "GlobalIllumination.h"
 #include "Renderer.h"
 #include "Scene.h"
 
-namespace Pass
+namespace Pass::Raytracing
 {
-	RaytracedGI::RaytracedGI(Renderer* renderer, SceneTLAS* sceneTLAS)
+	GlobalIllumination::GlobalIllumination(Renderer* renderer, SceneTLAS* sceneTLAS)
 		: RenderPass(renderer), m_SceneTLAS(sceneTLAS)
 	{
 		m_LinearWrapSampler = GetRenderer()->GetDevice()->createSampler(
@@ -15,7 +15,7 @@ namespace Pass
 		CreatePipeline();
 	}
 
-	void RaytracedGI::CreatePipeline()
+	void GlobalIllumination::CreatePipeline()
 	{
 		CreateRootSignature();
 
@@ -31,12 +31,12 @@ namespace Pass
 		}
 	}
 
-	void RaytracedGI::ResolutionChanged([[maybe_unused]] uint2 resolution)
+	void GlobalIllumination::ResolutionChanged([[maybe_unused]] uint2 resolution)
 	{
 		m_DirtyBindings = true;
 	}
 
-	void RaytracedGI::CreateRootSignature()
+	void GlobalIllumination::CreateRootSignature()
 	{
 		nvrhi::BindingLayoutDesc globalBindingLayoutDesc;
 		globalBindingLayoutDesc.visibility = nvrhi::ShaderType::All;
@@ -44,16 +44,21 @@ namespace Pass
 			nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
 			nvrhi::BindingLayoutItem::VolatileConstantBuffer(1),
 			nvrhi::BindingLayoutItem::RayTracingAccelStruct(0),
-			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1),
+			nvrhi::BindingLayoutItem::Texture_SRV(1),
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2),
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(3),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(4),
+			nvrhi::BindingLayoutItem::Texture_SRV(5),
+			nvrhi::BindingLayoutItem::Texture_SRV(6),
+			nvrhi::BindingLayoutItem::Texture_SRV(7),
+			nvrhi::BindingLayoutItem::Texture_SRV(8),
 			nvrhi::BindingLayoutItem::Sampler(0),
 			nvrhi::BindingLayoutItem::Texture_UAV(0)
 		};
 		m_BindingLayout = GetRenderer()->GetDevice()->createBindingLayout(globalBindingLayoutDesc);
 	}
 
-	bool RaytracedGI::CreateRayTracingPipeline()
+	bool GlobalIllumination::CreateRayTracingPipeline()
 	{
 		auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
 
@@ -110,14 +115,14 @@ namespace Pass
 		return true;
 	}
 
-	bool RaytracedGI::CreateComputePipeline()
+	bool GlobalIllumination::CreateComputePipeline()
 	{
 		eastl::vector<DxcDefine> defines = { { L"USE_RAY_QUERY", L"1" } };
 
 		auto device = GetRenderer()->GetDevice();
 
 		winrt::com_ptr<IDxcBlob> rayGenBlob;
-		ShaderUtils::CompileShader(rayGenBlob, L"data/shaders/raytracing/RaytracedGI/RayGeneration.hlsl", defines, L"cs_6_5");
+		ShaderUtils::CompileShader(rayGenBlob, L"data/shaders/raytracing/GlobalIllumination/RayGeneration.hlsl", defines, L"cs_6_5");
 		m_ComputeShader = device->createShader({ nvrhi::ShaderType::Compute, "", "Main" }, rayGenBlob->GetBufferPointer(), rayGenBlob->GetBufferSize());
 
 		if (!m_ComputeShader)
@@ -140,23 +145,32 @@ namespace Pass
 		return true;
 	}
 
-	void RaytracedGI::CheckBindings()
+	void GlobalIllumination::CheckBindings()
 	{
 		if (!m_DirtyBindings)
 			return;
 
 		auto* renderer = GetRenderer();
 
-		auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
+		auto* scene = Scene::GetSingleton();
+
+		auto* sceneGraph = scene->GetSceneGraph();
+
+		auto* renderTargets = renderer->GetRenderTargets();
 
 		nvrhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
 			nvrhi::BindingSetItem::ConstantBuffer(0, Scene::GetSingleton()->GetCameraBuffer()),
 			nvrhi::BindingSetItem::ConstantBuffer(1, m_SceneTLAS->GetRaytracingBuffer()),
 			nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_SceneTLAS->GetTopLevelAS()),
-			nvrhi::BindingSetItem::StructuredBuffer_SRV(1, sceneGraph->GetLightBuffer()),
-			nvrhi::BindingSetItem::StructuredBuffer_SRV(2, sceneGraph->GetInstanceBuffer()),
-			nvrhi::BindingSetItem::StructuredBuffer_SRV(3, sceneGraph->GetMeshBuffer()),
+			nvrhi::BindingSetItem::Texture_SRV(1, scene->GetSkyHemiTexture()),
+			nvrhi::BindingSetItem::StructuredBuffer_SRV(2, sceneGraph->GetLightBuffer()),
+			nvrhi::BindingSetItem::StructuredBuffer_SRV(3, sceneGraph->GetInstanceBuffer()),
+			nvrhi::BindingSetItem::StructuredBuffer_SRV(4, sceneGraph->GetMeshBuffer()),
+			nvrhi::BindingSetItem::Texture_SRV(5, renderer->GetDepthTexture()),
+			nvrhi::BindingSetItem::Texture_SRV(6, renderTargets->albedo),
+			nvrhi::BindingSetItem::Texture_SRV(7, renderTargets->normalRoughness),
+			nvrhi::BindingSetItem::Texture_SRV(8, renderTargets->gnmao),
 			nvrhi::BindingSetItem::Sampler(0, m_LinearWrapSampler),
 			nvrhi::BindingSetItem::Texture_UAV(0, renderer->GetMainTexture())
 		};
@@ -166,7 +180,7 @@ namespace Pass
 		m_DirtyBindings = false;
 	}
 
-	void RaytracedGI::Execute(nvrhi::ICommandList* commandList)
+	void GlobalIllumination::Execute(nvrhi::ICommandList* commandList)
 	{
 		CheckBindings();
 

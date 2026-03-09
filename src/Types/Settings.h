@@ -1,5 +1,17 @@
 #pragma once
 
+enum class Mode
+{
+	GlobalIllumination,
+	PathTracing
+};
+
+struct GeneralSettings
+{
+	Mode Mode = Mode::GlobalIllumination;
+	bool RaytracedShadows = false;
+};
+
 struct LightSettings
 {
 	float Directional = 1.0f;
@@ -45,7 +57,7 @@ struct DebugSettings
 struct Settings
 {
 	bool Enabled = true;
-	bool PathTracing = true;
+	GeneralSettings GeneralSettings;
 	LightSettings LightSettings;
 	LightingSettings LightingSettings;
 	RaytracingSettings RaytracingSettings;

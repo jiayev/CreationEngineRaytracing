@@ -1,12 +1,4 @@
-#if !(defined(SHARC) && SHARC_UPDATE) && DEBUG_TRACE_HEATMAP
-#   define NV_SHADER_EXTN_SLOT u127
-#   define NV_SHADER_EXTN_REGISTER_SPACE space0
-#   include "include/nvapi/nvHLSLExtns.h"
-
-#   include "include/nvapi/Profiling.hlsli"
-#endif
-
-#include "raytracing/Pathtracing/Registers.hlsli"
+#include "raytracing/RaytracedGI/Registers.hlsli"
 
 #include "include/Common.hlsli"
 #include "raytracing/include/Common.hlsli"
@@ -78,89 +70,70 @@ void Main()
 
 #endif    
     
-    RayDesc sourceRay = SetupPrimaryRay(idx, size, Camera);
-    
-    const float3 sourceDirection = sourceRay.Direction;
-    
-    uint randomSeed = InitRandomSeed(idx, size, Camera.FrameIndex);
-    
-#if !(defined(SHARC) && SHARC_UPDATE) && DEBUG_TRACE_HEATMAP       
-    uint startTime = NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO );
-#endif
-    
-    Payload sourcePayload = TraceRayStandard(Scene, sourceRay, randomSeed);
+    const float2 uv = float2(idx + 0.5f) / size;
 
-#if !(defined(SHARC) && SHARC_UPDATE) && DEBUG_TRACE_HEATMAP       
-    uint endTime = NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO );
-    uint deltaTime = timediff(startTime, endTime);
-    
-    // Scale the time delta value to [0,1]
-    static float heatmapScale = 300000.0f; // somewhat arbitrary scaling factor, experiment to find a value that works well in your app 
-    float deltaTimeScaled =  clamp( (float)deltaTime / heatmapScale, 0.0f, 1.0f );
+    const float depth = Depth.SampleLevel(DefaultSampler, uv, 0) * DEPTH_SCALE;
 
-    // Compute the heatmap color and write it to the output pixel
-    Output[idx] = float4(temperature(deltaTimeScaled), 1.0f);     
-    
-    return;
- #endif
-    
-    if (!sourcePayload.Hit())
+    const float depthVS = ScreenToViewDepth(depth, Camera.CameraData);
+
+    [branch]
+    if (depthVS < FP_VIEW_Z || depth >= SKY_Z)
     {
 #if !(defined(SHARC) && SHARC_UPDATE)
-        Output[idx] = float4(0.0f, 0.0f, 0.0f, 0.0f);
-        DiffuseAlbedo[idx] = float3(0.0f, 0.0f, 0.0f);   
-        SpecularAlbedo[idx] = float3(0.5f, 0.5f, 0.5f);    
-        NormalRoughness[idx] = float4(0.0f, 0.0f, 0.0f, 1.0f);
-        SpecularHitDistance[idx] = RAY_TMAX;            
-#endif     
+#   if defined(RAW_RADIANCE)
+        DiffuseOutput[idx] = float3(0.0f, 0.0f, 0.0f);
+        SpecularOutput[idx] = float3(0.0f, 0.0f, 0.0f);   
+        
+#   else
+        Output[idx] = float3(0.0f, 0.0f, 0.0f);  
+#   endif        
+
+#   if defined(DLSS_RR)
+        SpecularAlbedo[idx] = float3(0.5f, 0.5f, 0.5f);
+        SpecularHitDist[idx] = RAY_TMAX;
+#   endif
+#endif
         return;
-    }
-          
-    RayCone sourceRayCone = RayCone::make(Raytracing.PixelConeSpreadAngle * sourcePayload.hitDistance, Raytracing.PixelConeSpreadAngle);   
+    }    
     
-    float3 sourcePosition = Camera.Position.xyz + sourceDirection * sourcePayload.hitDistance;
+    const snorm float4 normalRoughness = NormalRoughness[idx];
     
-    Instance sourceInstance;
-    Material sourceMaterial;
+    const unorm float linearRoughness = normalRoughness.w;
+    
+    const unorm float4 normalMetalnessAO = GNMAO.SampleLevel(DefaultSampler, uv, 0);
 
-    Surface sourceSurface = SurfaceMaker::make(sourcePosition, sourcePayload, sourceDirection, sourceRayCone, sourceInstance, sourceMaterial);
-
-    BRDFContext sourceBRDFContext = BRDFContext::make(sourceSurface, -sourceDirection);
+    const half3 geometryNormalVS = DecodeNormal((half2)normalMetalnessAO.xy);
+    const float3 geometryNormalWS = normalize(ViewToWorldVector(geometryNormalVS, Camera.ViewInverse));    
     
-    if (dot(sourceSurface.FaceNormal, sourceBRDFContext.ViewDirection) < 0.0f) 
-        sourceSurface.FlipNormal();
+    const float metalness = normalMetalnessAO.z;
+    const float ao = 1.0f;    
+    
+    const float3 positionVS = ScreenToViewPosition(uv, depthVS, Camera.NDCToView);
+    const float3 positionCS = ViewToWorldPosition(positionVS, Camera.ViewInverse);
+    const float3 positionWS = positionCS + Camera.Position.xyz;    
+    
+    const float hitDistance = length(positionCS);
+    
+    const snorm float3 normalWS = normalRoughness.xyz;    
+    
+    float3 tangentWS, bitangentWS;
+    CreateOrthonormalBasis(normalWS, tangentWS, bitangentWS);    
+
+    float3 albedo = LLGammaToTrueLinear(Albedo.SampleLevel(DefaultSampler, uv, 0).rgb);
+
+    RayCone sourceRayCone = RayCone::make(Raytracing.PixelConeSpreadAngle * hitDistance, Raytracing.PixelConeSpreadAngle);
+    
+    Surface sourceSurface = SurfaceMaker::make(positionWS, geometryNormalWS, normalWS, tangentWS, bitangentWS, albedo, linearRoughness, metalness, 0, ao);
+    BRDFContext sourceBRDFContext = BRDFContext::make(sourceSurface, -positionCS / hitDistance);
 
     StandardBSDF sourceBSDF = StandardBSDF::make(sourceSurface, true);    
     
     AdjustShadingNormal(sourceSurface, sourceBRDFContext, true, false);    
-    
- #if !(defined(SHARC) && SHARC_UPDATE)
-    DiffuseAlbedo[idx] = sourceSurface.DiffuseAlbedo;   
-    const float2 envBRDF = BRDF::EnvBRDF(sourceSurface.Roughness, sourceBRDFContext.NdotV);
-    SpecularAlbedo[idx] = float3(sourceSurface.F0 * envBRDF.x + envBRDF.y);
-    NormalRoughness[idx] = float4(sourceSurface.Normal, sourceSurface.Roughness);   
-#endif       
+
+    uint randomSeed = InitRandomSeed(idx, size, Camera.FrameIndex);   
     
     bool isSssPath = false;
-    
-    float3 direct = sourceSurface.Emissive;
-    
- #if defined(SHARC) && SHARC_DEBUG
-    HashGridParameters gridParameters = GetSharcGridParameters();
 
-    Output[idx] = float4(HashGridDebugColoredHash(sourceSurface.Position, sourceSurface.GeomNormal, gridParameters), 1);
-    return;
-#endif     
-    
-#ifdef SUBSURFACE_SCATTERING
-    if (sourceSurface.SubsurfaceData.HasSubsurface != 0) {
-        direct += EvaluateSubsurfaceNEE(sourceSurface, sourceBRDFContext, sourceMaterial, sourceInstance, sourcePayload, sourceRayCone, randomSeed);
-        isSssPath = true;
-    }
-    else
-#endif
-        direct += EvaluateDirectRadiance(sourceMaterial, sourceSurface, sourceBRDFContext, sourceInstance, sourceBSDF, randomSeed);      
-    
     float3 direction;
     MonteCarlo::BRDFWeight brdfWeight;
 
@@ -197,11 +170,7 @@ void Main()
         brdfContext = sourceBRDFContext;
         bsdf = sourceBSDF;
         rayCone = sourceRayCone; 
-        
-        material = sourceMaterial;
-        instance = sourceInstance;
-        payload = sourcePayload;
-        
+
         float3 sampleRadiance = float3(0.0f, 0.0f, 0.0f);
         float3 throughput = float3(1.0f, 1.0f, 1.0f);
         float materialRoughnessPrev = 0.0f;
@@ -403,9 +372,24 @@ void Main()
     }
 
     radiance /= MAX_SAMPLES;        
-
+      
+    
 #if !(defined(SHARC) && SHARC_UPDATE)
-    Output[idx] = float4(LLTrueLinearToGamma(direct + radiance), 1.0f);
-    SpecularHitDistance[idx] = specHitDist;     
+#   if defined(RAW_RADIANCE) || defined(DLSS_RR)
+    const float2 envBRDF = BRDF::EnvBRDF(sourceSurface.Roughness, sourceBRDFContext.NdotV);
+    const float3 specularAlbedo = float3(sourceSurface.F0 * envBRDF.x + envBRDF.y);
+#   endif
+    
+#   if defined(RAW_RADIANCE)
+    DiffuseOutput[idx] = float3(isSpecular ? 0.0f : radiance);
+    SpecularOutput[idx] = float3(isSpecular ? radiance * specularAlbedo : 0.0f);
+#   else
+    Output[idx] = radiance;   
+#   endif
+    
+#   if defined(DLSS_RR) 
+    SpecularAlbedo[idx] = specularAlbedo;
+    SpecularHitDistance[idx] = specHitDist;
+#   endif
 #endif    
 }
