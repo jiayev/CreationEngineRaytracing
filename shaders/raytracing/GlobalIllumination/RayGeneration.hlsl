@@ -75,7 +75,7 @@ void Main()
     // If the game has dynamic resolution enabled the textures will not cover the entire extent
     const float2 dynamicUV = float2(idx + 0.5f) / Camera.ScreenSize;   
     
-    const float depth = Depth.SampleLevel(DefaultSampler, uv, 0) * DEPTH_SCALE;
+    const float depth = Depth.SampleLevel(DefaultSampler, dynamicUV, 0) * DEPTH_SCALE;
 
     const float depthVS = ScreenToViewDepth(depth, Camera.CameraData);
 
@@ -99,11 +99,11 @@ void Main()
         return;
     }    
     
-    const snorm float4 normalRoughness = NormalRoughness[idx];
+    const snorm float4 normalRoughness = NormalRoughness.SampleLevel(DefaultSampler, dynamicUV, 0);
     
     const unorm float linearRoughness = normalRoughness.w;
     
-    const unorm float4 normalMetalnessAO = GNMAO.SampleLevel(DefaultSampler, uv, 0);
+    const unorm float4 normalMetalnessAO = GNMAO.SampleLevel(DefaultSampler, dynamicUV, 0);
 
     const half3 geometryNormalVS = DecodeNormal((half2)normalMetalnessAO.xy);
     const float3 geometryNormalWS = normalize(ViewToWorldVector(geometryNormalVS, Camera.ViewInverse));    
@@ -122,7 +122,7 @@ void Main()
     float3 tangentWS, bitangentWS;
     CreateOrthonormalBasis(normalWS, tangentWS, bitangentWS);    
 
-    float3 albedo = LLGammaToTrueLinear(Albedo.SampleLevel(DefaultSampler, uv, 0).rgb);
+    float3 albedo = LLGammaToTrueLinear(Albedo.SampleLevel(DefaultSampler, dynamicUV, 0).rgb);
 
     RayCone sourceRayCone = RayCone::make(Raytracing.PixelConeSpreadAngle * hitDistance, Raytracing.PixelConeSpreadAngle);
     
