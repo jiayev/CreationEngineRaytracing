@@ -1,8 +1,8 @@
 #ifndef MONTE_CARLO_HLSL
 #define MONTE_CARLO_HLSL
 
-#include "include/BRDF.hlsli"
-#include "include/Color.hlsli"
+#include "include/Common/BRDF.hlsli"
+#include "include/Common/Color.hlsli"
 #include "Raytracing/Include/Common.hlsli"
 #include "Include/Surface.hlsli"
 #include "Include/Utils/MathConstants.hlsli"

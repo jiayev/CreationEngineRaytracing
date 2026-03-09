@@ -3,7 +3,7 @@
 #ifndef __BSDF_HLSLI__
 #define __BSDF_HLSLI__
 
-#include "include/BRDF.hlsli"
+#include "include/Common/BRDF.hlsli"
 #include "include/Utils/MathHelpers.hlsli"
 #include "include/Surface.hlsli"
 

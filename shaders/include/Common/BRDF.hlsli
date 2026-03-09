@@ -2,7 +2,7 @@
 #define __BRDF_DEPENDENCY_HLSL__
 
 #include "Include/Common.hlsli"
-#include "Include/Color.hlsli"
+#include "Include/Common/Color.hlsli"
 #include "Include/Utils/MathConstants.hlsli"
 
 /**
