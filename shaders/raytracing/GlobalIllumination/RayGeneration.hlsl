@@ -354,7 +354,7 @@ void Main()
             else
 #endif
             { 
-                directRadiance += EvaluateDirectRadiance(material, surface, brdfContext, instance, bsdf, randomSeed);
+                directRadiance += EvaluateDirectRadiance(material, surface, brdfContext, instance, bsdf, randomSeed, true);
             }
             
             sampleRadiance += directRadiance * throughput;
