@@ -275,8 +275,6 @@ void Scene::RemoveLight(const RE::NiPointer<RE::BSLight>& light)
 
 void Scene::UpdateCameraData() const
 {
-	auto test = RE::BSGraphics::Renderer::GetSingleton()->GetRuntimeData();
-
 	auto& runtimeData = RE::BSGraphics::RendererShadowState::GetSingleton()->GetRuntimeData();
 
 	auto cameraData = runtimeData.cameraData.getEye();
