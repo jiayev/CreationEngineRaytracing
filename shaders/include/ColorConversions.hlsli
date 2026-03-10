@@ -6,6 +6,9 @@
 #define LLSETTINGS Features.LinearLighting
 #define LLON LLSETTINGS.enableLinearLighting
 
+// Light multiplier to match vanilla raster
+#define LIGHT_MULTIPLIER (12.0f)
+
 float3 ColorToLinear(float3 color)
 {
     return pow(abs(color), (LLON ? LLSETTINGS.colorGamma : 2.2f));
@@ -23,12 +26,16 @@ float3 LightToLinear(float3 color)
 
 float3 PointLightToLinear(float3 color, bool isLinear)
 {
-    return (isLinear && LLON) ? color : LightToLinear(color) * LLSETTINGS.pointLightMult;
+    float mult = LLON ? LLSETTINGS.pointLightMult : 1.0f;    
+    float3 finalColor = (isLinear && LLON) ? color : LightToLinear(color);    
+    return finalColor * mult * LIGHT_MULTIPLIER;
 }
 
 float3 DirLightToLinear(float3 color)
 {
-    return (LLSETTINGS.isDirLightLinear && LLON) ? color : LightToLinear(color) * LLSETTINGS.directionalLightMult * LLSETTINGS.dirLightMult;
+    float mult = LLON ? LLSETTINGS.directionalLightMult * LLSETTINGS.dirLightMult : 1.0f;   
+    float3 finalColor = (LLSETTINGS.isDirLightLinear && LLON) ? color : LightToLinear(color);  
+    return finalColor * mult * LIGHT_MULTIPLIER;
 }
 
 float3 GlowToLinear(float3 color)
