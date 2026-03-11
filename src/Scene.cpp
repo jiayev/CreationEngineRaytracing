@@ -348,4 +348,6 @@ void Scene::UpdateSettings(Settings settings)
 
 	if (currentMode != previousMode || !rootNode->HasRenderNode())
 		UpdateMode(currentMode, previousMode);
+
+	rootNode->SettingsChanged(settings);
 }

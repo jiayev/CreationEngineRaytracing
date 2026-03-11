@@ -6,8 +6,16 @@ enum class Mode
 	PathTracing
 };
 
+enum class Denoiser
+{
+	None,
+	DLSS_RR,
+	Other
+};
+
 struct GeneralSettings
 {
+	Denoiser Denoiser = Denoiser::None;
 	Mode Mode = Mode::GlobalIllumination;
 	bool RaytracedShadows = false;
 };

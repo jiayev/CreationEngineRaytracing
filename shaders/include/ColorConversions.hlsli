@@ -26,16 +26,16 @@ float3 LightToLinear(float3 color)
 
 float3 PointLightToLinear(float3 color, bool isLinear)
 {
-    float mult = LLON ? LLSETTINGS.pointLightMult : 1.0f;    
+    float mult = LLON ? LLSETTINGS.pointLightMult : LIGHT_MULTIPLIER;    
     float3 finalColor = (isLinear && LLON) ? color : LightToLinear(color);    
-    return finalColor * mult * LIGHT_MULTIPLIER;
+    return finalColor * mult;
 }
 
 float3 DirLightToLinear(float3 color)
 {
-    float mult = LLON ? LLSETTINGS.directionalLightMult * LLSETTINGS.dirLightMult : 1.0f;   
+    float mult = LLON ? LLSETTINGS.directionalLightMult * LLSETTINGS.dirLightMult : LIGHT_MULTIPLIER;   
     float3 finalColor = (LLSETTINGS.isDirLightLinear && LLON) ? color : LightToLinear(color);  
-    return finalColor * mult * LIGHT_MULTIPLIER;
+    return finalColor * mult;
 }
 
 float3 GlowToLinear(float3 color)

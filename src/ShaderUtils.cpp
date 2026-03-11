@@ -100,7 +100,7 @@ namespace ShaderUtils
 		}
 	}
 
-	nvrhi::ShaderLibraryHandle CompileShaderLibrary(nvrhi::IDevice* device, const wchar_t* filePath, eastl::vector<DxcDefine> defines)
+	nvrhi::ShaderLibraryHandle CompileShaderLibrary(nvrhi::IDevice* device, const wchar_t* filePath, const eastl::vector<DxcDefine>& defines)
 	{
 		winrt::com_ptr<IDxcBlob> blob;
 		ShaderUtils::CompileShader(blob, filePath, defines);
@@ -109,5 +109,20 @@ namespace ShaderUtils
 			return nullptr;
 
 		return device->createShaderLibrary(blob->GetBufferPointer(), blob->GetBufferSize());
+	}
+
+	nvrhi::ShaderLibraryHandle CompileShaderLibrary(nvrhi::IDevice* device, const wchar_t* filePath, const eastl::vector<ShaderDefine>& defines)
+	{
+		auto numDefines = defines.size();
+
+		eastl::vector<DxcDefine> dxcDefines(numDefines);
+
+		for (size_t i = 0; i < numDefines; i++)
+		{
+			auto& define = defines[i];
+			dxcDefines[i] = { define.name.c_str(), define.value.c_str() };
+		}
+
+		CompileShaderLibrary(device, filePath, dxcDefines);
 	}
 };

@@ -12,42 +12,10 @@ namespace Pass
 			.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap)
 			.setAllFilters(true));
 
+		m_Defines = Util::Shader::GetRaytracingDefines(Scene::GetSingleton()->m_Settings, true, false);
+
+		CreateBindingLayout();
 		CreatePipeline();
-	}
-
-	void PathTracing::CreatePipeline()
-	{
-		CreateRootSignature();
-
-		auto* scene = Scene::GetSingleton();
-		auto& rtSettings = scene->m_Settings.RaytracingSettings;
-
-		const auto bouncesWStr = std::to_wstring(rtSettings.Bounces);
-		const auto samplesWStr = std::to_wstring(rtSettings.SamplesPerPixel);
-
-		eastl::vector<DxcDefine> defines = {
-			{ L"MAX_BOUNCES", bouncesWStr.c_str() },
-			{ L"MAX_SAMPLES", samplesWStr.c_str() },
-			{ L"USE_LIGHT_TLAS", L"0" },
-			{ L"SHARC", L"" },
-			{ L"SHARC_UPDATE", L"0" },
-			{ L"SHARC_RESOLVE", L"0" },
-			{ L"SHARC_DEBUG", L"0" },
-			{ L"DEBUG_TRACE_HEATMAP", L"0" },
-			{ L"EXP_VANILLA_PBR_ROUGHNESS", L"0" },
-			{ L"EXP_VANILLA_PBR_METALLIC", L"0" }
-		};
-
-		if (GetRenderer()->m_Settings.UseRayQuery)
-		{
-			if (!CreateComputePipeline(defines))
-				return;
-		}
-		else
-		{
-			if (!CreateRayTracingPipeline(defines))
-				return;
-		}
 	}
 
 	void PathTracing::ResolutionChanged([[maybe_unused]] uint2 resolution)
@@ -55,7 +23,18 @@ namespace Pass
 		m_DirtyBindings = true;
 	}
 
-	void PathTracing::CreateRootSignature()
+	void PathTracing::SettingsChanged(const Settings& settings)
+	{
+		auto defines = Util::Shader::GetRaytracingDefines(settings, true, false);
+
+		if (defines != m_Defines) {
+			m_Defines = defines;
+			CreatePipeline();
+			m_DirtyBindings = true;
+		}
+	}
+
+	void PathTracing::CreateBindingLayout()
 	{
 		nvrhi::BindingLayoutDesc globalBindingLayoutDesc;
 		globalBindingLayoutDesc.visibility = nvrhi::ShaderType::All;
@@ -86,10 +65,17 @@ namespace Pass
 		m_BindingLayout = GetRenderer()->GetDevice()->createBindingLayout(globalBindingLayoutDesc);
 	}
 
-	bool PathTracing::CreateRayTracingPipeline(eastl::vector<DxcDefine>& defines)
+	void PathTracing::CreatePipeline()
 	{
-		auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
+		if (GetRenderer()->m_Settings.UseRayQuery)
+			CreateComputePipeline();
+		else
+			CreateRayTracingPipeline();
+	}
 
+	void PathTracing::CreateRayTracingPipeline()
+	{
+		auto defines = Util::Shader::GetDXCDefines(m_Defines);
 		defines.emplace_back(L"USE_RAY_QUERY", L"0");
 
 		auto device = GetRenderer()->GetDevice();
@@ -119,6 +105,8 @@ namespace Pass
 			}
 		};
 
+		auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
+
 		pipelineDesc.globalBindingLayouts = {
 			m_BindingLayout,
 			sceneGraph->GetTriangleDescriptors()->m_Layout,
@@ -136,7 +124,7 @@ namespace Pass
 
 		m_RayPipeline = device->createRayTracingPipeline(pipelineDesc);
 		if (!m_RayPipeline)
-			return false;
+			return;
 
 		auto shaderTableDesc = nvrhi::rt::ShaderTableDesc()
 			.enableCaching(3)
@@ -144,17 +132,16 @@ namespace Pass
 
 		m_ShaderTable = m_RayPipeline->createShaderTable(shaderTableDesc);
 		if (!m_ShaderTable)
-			return false;
+			return;
 
 		m_ShaderTable->setRayGenerationShader("RayGen");
 		m_ShaderTable->addMissShader("Miss");
 		m_ShaderTable->addHitGroup("HitGroup");
-
-		return true;
 	}
 
-	bool PathTracing::CreateComputePipeline(eastl::vector<DxcDefine>& defines)
+	void PathTracing::CreateComputePipeline()
 	{
+		auto defines = Util::Shader::GetDXCDefines(m_Defines);
 		defines.emplace_back(L"USE_RAY_QUERY", L"1");
 
 		auto device = GetRenderer()->GetDevice();
@@ -164,7 +151,7 @@ namespace Pass
 		m_ComputeShader = device->createShader({ nvrhi::ShaderType::Compute, "", "Main" }, rayGenBlob->GetBufferPointer(), rayGenBlob->GetBufferSize());
 
 		if (!m_ComputeShader)
-			return false;
+			return;
 
 		auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
 
@@ -177,11 +164,6 @@ namespace Pass
 			.addBindingLayout(m_LightTLAS->GetBindlessLayout());
 
 		m_ComputePipeline = GetRenderer()->GetDevice()->createComputePipeline(pipelineDesc);
-
-		if (!m_ComputePipeline)
-			return false;
-
-		return true;
 	}
 
 	void PathTracing::CheckBindings()

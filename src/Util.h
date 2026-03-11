@@ -5,8 +5,9 @@
 #include "Utils/Game.h"
 #include "Utils/Geometry.h"
 #include "Utils/Material.h"
-#include "Utils/Traversal.h"
 #include "Utils/Math.h"
+#include "Utils/Shader.h"
+#include "Utils/Traversal.h"
 
 #include "magic_enum_spec.h"
 

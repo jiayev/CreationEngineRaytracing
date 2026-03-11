@@ -12,6 +12,8 @@
 #include "Pass/Raytracing/Common/LightTLAS.h"
 #include "Pass/Raytracing/Common/SHaRC.h"
 
+#include "Types/ShaderDefine.h"
+
 namespace Pass
 {
 	class PathTracing : public RenderPass
@@ -41,6 +43,8 @@ namespace Pass
 			nvrhi::TextureHandle specularHitDistTexture;
 		};
 
+		eastl::vector<ShaderDefine> m_Defines;
+
 		/*ResourceHandle m_DirectInput;
 		ResourceHandle m_DiffuseOutput;
 		ResourceHandle m_SpecularOutput;*/
@@ -48,15 +52,17 @@ namespace Pass
 	public:
 		PathTracing(Renderer* renderer, SceneTLAS* m_SceneTLAS, LightTLAS* lightTLAS, SHaRC* sharc);
 
-		virtual void CreatePipeline() override;
-
 		virtual void ResolutionChanged(uint2 resolution) override;
 
-		void CreateRootSignature();
+		virtual void SettingsChanged(const Settings& settings) override;
 
-		bool CreateRayTracingPipeline(eastl::vector<DxcDefine>& defines);
+		void CreateBindingLayout();
 
-		bool CreateComputePipeline(eastl::vector<DxcDefine>& defines);
+		virtual void CreatePipeline() override;
+
+		void CreateRayTracingPipeline();
+
+		void CreateComputePipeline();
 
 		void CheckBindings();
 
