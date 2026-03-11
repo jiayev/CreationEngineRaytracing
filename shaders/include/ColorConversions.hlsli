@@ -7,7 +7,7 @@
 #define LLON LLSETTINGS.enableLinearLighting
 
 // Light multiplier to match vanilla raster
-#define LIGHT_MULTIPLIER (12.0f)
+#define LIGHT_MULTIPLIER (1.0f)
 
 float3 ColorToLinear(float3 color)
 {
