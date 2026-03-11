@@ -219,11 +219,10 @@ void Scene::Update(nvrhi::ICommandList* commandList)
 	// Update camera data buffer
 	commandList->writeBuffer(m_CameraBuffer, m_CameraData.get(), sizeof(CameraData));
 
-	if (m_DirtyFeatureData)
-	{
-		commandList->writeBuffer(m_FeatureBuffer, m_FeatureData.get(), sizeof(FeatureData));
-		m_DirtyFeatureData = false;
-	}
+	// Volatile constant buffers must be written into for each command list recording
+	// before they are bound by any pass in that recording.
+	commandList->writeBuffer(m_FeatureBuffer, m_FeatureData.get(), sizeof(FeatureData));
+	m_DirtyFeatureData = false;
 }
 
 void Scene::ClearDirtyStates()
