@@ -57,6 +57,8 @@ StructuredBuffer<uint64_t>                  SharcHashEntriesBuffer      : regist
 #   endif
 #endif
 
+Texture2D<float4>                           PhysicalSkyTrLUT            : register(t11);
+
 StructuredBuffer<Triangle>                  Triangles[]                 : register(t0, space1);
 StructuredBuffer<Vertex>                    Vertices[]                  : register(t0, space2);
 Texture2D<float4>                           Textures[]                  : register(t0, space3);
