@@ -793,7 +793,8 @@ void Main()
                 SharcUpdateMiss(sharcParameters, sharcState, skyIrradiance);
 #elif PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
                 // In FILL mode: skip sky if on stable branch (already captured in BUILD)
-                if (!fillState.hasFlag(kStablePlaneFlag_OnBranch))
+                // When ReSTIR GI active: skip accumulation after first scatter (GI handles indirect)
+                if (!fillState.hasFlag(kStablePlaneFlag_OnBranch) && !(Raytracing.RestirGIActive && restirGI_capturedScatterPdf))
                 {
                     float specAvg = isSpecular ? Color::RGBToLuminance(skyIrradiance * throughput) : 0;
                     fillPathL += float4(skyIrradiance * throughput, specAvg);
@@ -829,7 +830,7 @@ void Main()
             for (uint effectBouncePass = 0; effectBouncePass < 16 && material.ShaderType == ShaderType::Effect; effectBouncePass++)
             {
 #if PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
-                if (!fillState.hasFlag(kStablePlaneFlag_OnBranch) && any(surface.Emissive > 0))
+                if (!fillState.hasFlag(kStablePlaneFlag_OnBranch) && any(surface.Emissive > 0) && !(Raytracing.RestirGIActive && restirGI_capturedScatterPdf))
                 {
                     float specAvg = isSpecular ? Color::RGBToLuminance(surface.Emissive * throughput) : 0;
                     fillPathL += float4(surface.Emissive * throughput, specAvg);
@@ -865,7 +866,7 @@ void Main()
 #if defined(SHARC) && SHARC_UPDATE
                 SharcUpdateMiss(sharcParameters, sharcState, skyIrradiance);
 #elif PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
-                if (!fillState.hasFlag(kStablePlaneFlag_OnBranch))
+                if (!fillState.hasFlag(kStablePlaneFlag_OnBranch) && !(Raytracing.RestirGIActive && restirGI_capturedScatterPdf))
                 {
                     float specAvg = isSpecular ? Color::RGBToLuminance(skyIrradiance * throughput) : 0;
                     fillPathL += float4(skyIrradiance * throughput, specAvg);
@@ -908,7 +909,7 @@ void Main()
             if (isValidHit && SharcGetCachedRadiance(sharcParameters, sharcHitData, sharcRadiance, false))
             {
 #if PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
-                if (!fillState.hasFlag(kStablePlaneFlag_OnBranch))
+                if (!fillState.hasFlag(kStablePlaneFlag_OnBranch) && !(Raytracing.RestirGIActive && restirGI_capturedScatterPdf))
                 {
                     float specAvg = isSpecular ? Color::RGBToLuminance(sharcRadiance * throughput) : 0;
                     fillPathL += float4(sharcRadiance * throughput, specAvg);
@@ -966,8 +967,8 @@ void Main()
             }
             
 #if PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
-            // NEE/direct radiance: always accumulated (not captured in BUILD)
-            if (any(directRadiance > 0))
+            // NEE/direct radiance: accumulated unless ReSTIR GI handles indirect
+            if (any(directRadiance > 0) && !(Raytracing.RestirGIActive && restirGI_capturedScatterPdf))
             {
                 float specAvg = isSpecular ? Color::RGBToLuminance(directRadiance * throughput) : 0;
                 fillPathL += float4(directRadiance * throughput, specAvg);
@@ -980,10 +981,14 @@ void Main()
                 ReSTIRGI_AddSecondarySurfaceRadiance(idx, directRadiance * relThp);
             }
             // Emissive: gated by OnBranch (BUILD already captured emissive along delta paths)
+            // When ReSTIR GI active: skip fillPathL after first scatter (GI handles indirect)
             if (!fillState.hasFlag(kStablePlaneFlag_OnBranch) && any(surface.Emissive > 0))
             {
-                float specAvg = isSpecular ? Color::RGBToLuminance(surface.Emissive * throughput) : 0;
-                fillPathL += float4(surface.Emissive * throughput, specAvg);
+                if (!(Raytracing.RestirGIActive && restirGI_capturedScatterPdf))
+                {
+                    float specAvg = isSpecular ? Color::RGBToLuminance(surface.Emissive * throughput) : 0;
+                    fillPathL += float4(surface.Emissive * throughput, specAvg);
+                }
                 // ReSTIR GI: also accumulate emissive at secondary surface
                 if (restirGI_capturedSecondary)
                 {

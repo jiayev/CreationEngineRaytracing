@@ -1,6 +1,7 @@
 // GI Final Shading — Compute pass for ReSTIR GI final contribution
 // Evaluates the BRDF at the primary surface with the selected reservoir sample,
 // optionally traces a visibility ray, and writes the result.
+// When denoising is enabled, writes to StablePlanesBuffer (dominant plane) instead of output texture.
 
 #pragma pack_matrix(row_major)
 
@@ -10,6 +11,9 @@
 #include "interop/ReSTIRGIData.hlsli"
 #include "raytracing/include/ReSTIRGIBindings.hlsli"
 #include "raytracing/include/ReSTIRGI.hlsli"
+
+// Include StablePlane struct and packing helpers for write-back
+#include "raytracing/include/StablePlanesGIHelper.hlsli"
 
 float RGBToLuminance(float3 color)
 {
@@ -52,7 +56,12 @@ Texture2D<float4>                     DiffuseAlbedoTexture    : register(t2);
 RaytracingAccelerationStructure       SceneBVH                : register(t3);
 
 RWStructuredBuffer<PackedGIReservoir> GIReservoirBuffer       : register(u0);
-RWTexture2D<float4>                   OutputColor             : register(u1);  // Main output (additive)
+RWTexture2D<float4>                   OutputColor             : register(u1);  // Main output (additive, non-denoising path)
+
+// Stable Planes UAVs (for denoising write-back)
+RWTexture2DArray<uint>                StablePlanesHeaderUAV   : register(u5);
+RWStructuredBuffer<StablePlane>       StablePlanesUAV         : register(u6);
+RWTexture2D<float4>                   StableRadianceUAV       : register(u7);
 
 // ----- Final Shading -----
 
@@ -156,6 +165,23 @@ void Main(uint2 GlobalIndex : SV_DispatchThreadID, uint2 LocalIndex : SV_GroupTh
     if (any(isinf(attenuatedRadiance)) || any(isnan(attenuatedRadiance)))
         attenuatedRadiance = 0;
 
-    // Add ReSTIR GI contribution to the main output
-    OutputColor[pixelPosition] += float4(attenuatedRadiance, 0);
+    // Write output: either to StablePlanesBuffer (denoising) or OutputColor (direct)
+    if (GIConst.denoisingEnabled)
+    {
+        // Find dominant stable plane address and accumulate GI contribution
+        uint dominantIndex = StablePlanesHeaderUAV[uint3(pixelPosition, 3)] & 0x3;
+        uint address = pixelPosition.y * GIConst.stablePlaneRenderWidth + pixelPosition.x
+                     + dominantIndex * GIConst.stablePlaneRenderWidth * GIConst.frameDim.y;
+
+        // Read-modify-write: sqrt-decode existing, add GI contribution, sqrt-encode back
+        float4 existing = Fp16ToFp32(StablePlanesUAV[address].PackedNoisyRadianceAndSpecAvg);
+        float4 decodedExisting = existing * existing;  // sqrt-decode
+        float4 giContribution = float4(attenuatedRadiance, 0);
+        StablePlanesUAV[address].PackedNoisyRadianceAndSpecAvg = Fp32ToFp16(sqrt(max(decodedExisting + giContribution, 0)));
+    }
+    else
+    {
+        // Add ReSTIR GI contribution to the main output
+        OutputColor[pixelPosition] += float4(attenuatedRadiance, 0);
+    }
 }

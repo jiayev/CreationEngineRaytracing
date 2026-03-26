@@ -115,8 +115,8 @@ INTEROP_STRUCT(ReSTIRGIConstants, 16)
     uint  varyAgeThreshold;
 
     uint2 frameDim;
-    uint  pad1;
-    uint  pad2;
+    uint  denoisingEnabled;        // When true, GI final shading writes to StablePlanesBuffer
+    uint  stablePlaneRenderWidth;  // Render width for StablePlane addressing
 };
 VALIDATE_CBUFFER(ReSTIRGIConstants, 16);
 

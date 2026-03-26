@@ -113,6 +113,19 @@ struct DebugSettings
 	bool StablePlanes = true;
 };
 
+struct ReSTIRGISettings
+{
+	bool Enabled = true;
+	bool EnableTemporalResampling = true;
+	bool EnableBoilingFilter = true;
+	float BoilingFilterStrength = 0.2f;
+	int MaxHistoryLength = 20;
+	int NumSpatialSamples = 3;
+	float SpatialSamplingRadius = 32.0f;
+	bool EnableFinalVisibility = true;
+	bool EnableFinalMIS = false;
+};
+
 struct Settings
 {
 	bool Enabled = true;
@@ -124,4 +137,5 @@ struct Settings
 	AdvancedSettings AdvancedSettings;
 	WaterSettings WaterSettings;
 	DebugSettings DebugSettings;
+	ReSTIRGISettings ReSTIRGISettings;
 };

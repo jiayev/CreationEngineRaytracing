@@ -148,7 +148,10 @@ namespace Pass
 				nvrhi::BindingLayoutItem::Texture_SRV(2),             // DiffuseAlbedoTexture
 				nvrhi::BindingLayoutItem::RayTracingAccelStruct(3),   // SceneBVH
 				nvrhi::BindingLayoutItem::StructuredBuffer_UAV(0),    // GIReservoirBuffer
-				nvrhi::BindingLayoutItem::Texture_UAV(1),             // RestirGIOutput
+				nvrhi::BindingLayoutItem::Texture_UAV(1),             // OutputColor
+				nvrhi::BindingLayoutItem::Texture_UAV(5),             // StablePlanesHeader
+				nvrhi::BindingLayoutItem::StructuredBuffer_UAV(6),    // StablePlanesBuffer
+				nvrhi::BindingLayoutItem::Texture_UAV(7),             // StableRadiance
 				nvrhi::BindingLayoutItem::Texture_UAV(10),            // SecondarySurfacePositionNormal (for MIS)
 				nvrhi::BindingLayoutItem::Texture_UAV(11),            // SecondarySurfaceRadiance (for MIS)
 			};
@@ -169,6 +172,21 @@ namespace Pass
 	{
 		CreateResources(resolution);
 		m_DirtyBindings = true;
+	}
+
+	void ReSTIRGI::SettingsChanged(const Settings& settings)
+	{
+		auto& gi = settings.ReSTIRGISettings;
+		m_Enabled = gi.Enabled;
+		m_EnableTemporalResampling = gi.EnableTemporalResampling;
+		m_EnableBoilingFilter = gi.EnableBoilingFilter;
+		m_BoilingFilterStrength = gi.BoilingFilterStrength;
+		m_MaxHistoryLength = static_cast<uint32_t>(gi.MaxHistoryLength);
+		m_NumSpatialSamples = static_cast<uint32_t>(gi.NumSpatialSamples);
+		m_SpatialSamplingRadius = gi.SpatialSamplingRadius;
+		m_EnableFinalVisibility = gi.EnableFinalVisibility;
+		m_EnableFinalMIS = gi.EnableFinalMIS;
+		m_DenoisingEnabled = settings.DebugSettings.StablePlanes;
 	}
 
 	void ReSTIRGI::CheckBindings()
@@ -212,6 +230,8 @@ namespace Pass
 
 		// --- Final Shading Bindings ---
 		{
+			auto* sp = renderer->GetStablePlanes();
+
 			nvrhi::BindingSetDesc desc;
 			desc.bindings = {
 				nvrhi::BindingSetItem::ConstantBuffer(0, scene->GetCameraBuffer()),
@@ -222,6 +242,9 @@ namespace Pass
 				nvrhi::BindingSetItem::RayTracingAccelStruct(3, m_SceneTLAS->GetTopLevelAS().GetHandle()),
 				nvrhi::BindingSetItem::StructuredBuffer_UAV(0, m_ReservoirBuffer),
 				nvrhi::BindingSetItem::Texture_UAV(1, renderer->GetMainTexture()),
+				nvrhi::BindingSetItem::Texture_UAV(5, sp->header),
+				nvrhi::BindingSetItem::StructuredBuffer_UAV(6, sp->buffer),
+				nvrhi::BindingSetItem::Texture_UAV(7, sp->stableRadiance),
 				nvrhi::BindingSetItem::Texture_UAV(10, m_SecondarySurfacePositionNormal),
 				nvrhi::BindingSetItem::Texture_UAV(11, m_SecondarySurfaceRadiance),
 			};
@@ -237,34 +260,43 @@ namespace Pass
 		m_GIConstants.frameIndex = m_FrameIndex;
 		m_GIConstants.rayEpsilon = 1e-3f;
 
+		// Stable planes addressing (for GI final shading write-back)
+		m_GIConstants.denoisingEnabled = m_DenoisingEnabled ? 1 : 0;
+		m_GIConstants.stablePlaneRenderWidth = resolution.x;
+
 		// Temporal resampling enabled by default
-		m_GIConstants.enableTemporalResampling = 1;
+		m_GIConstants.enableTemporalResampling = m_EnableTemporalResampling ? 1 : 0;
 		m_GIConstants.varyAgeThreshold = 1;
 
 		// Runtime params
 		m_GIConstants.runtimeParams.activeCheckerboardField = 0;
 		m_GIConstants.runtimeParams.neighborOffsetMask = 0xFF;
 
+		// Apply user-configurable parameters
+		m_GIConstants.temporalResamplingParams.maxHistoryLength = m_MaxHistoryLength;
+		m_GIConstants.spatialResamplingParams.numSpatialSamples = m_NumSpatialSamples;
+		m_GIConstants.spatialResamplingParams.spatialSamplingRadius = m_SpatialSamplingRadius;
+
 		// Temporal params
 		m_GIConstants.temporalResamplingParams.depthThreshold = 0.1f;
 		m_GIConstants.temporalResamplingParams.normalThreshold = 0.5f;
-		m_GIConstants.temporalResamplingParams.maxHistoryLength = 20;
+		m_GIConstants.temporalResamplingParams.maxHistoryLength = m_MaxHistoryLength;
 		m_GIConstants.temporalResamplingParams.maxReservoirAge = 50;
 		m_GIConstants.temporalResamplingParams.enablePermutationSampling = 1;
 		m_GIConstants.temporalResamplingParams.enableFallbackSampling = 1;
-		m_GIConstants.temporalResamplingParams.enableBoilingFilter = 1;
-		m_GIConstants.temporalResamplingParams.boilingFilterStrength = 0.2f;
+		m_GIConstants.temporalResamplingParams.enableBoilingFilter = m_EnableBoilingFilter ? 1 : 0;
+		m_GIConstants.temporalResamplingParams.boilingFilterStrength = m_BoilingFilterStrength;
 		m_GIConstants.temporalResamplingParams.uniformRandomNumber = m_FrameIndex;
 
 		// Spatial params
 		m_GIConstants.spatialResamplingParams.spatialDepthThreshold = 0.1f;
 		m_GIConstants.spatialResamplingParams.spatialNormalThreshold = 0.5f;
-		m_GIConstants.spatialResamplingParams.numSpatialSamples = 3;
-		m_GIConstants.spatialResamplingParams.spatialSamplingRadius = 32.0f;
+		m_GIConstants.spatialResamplingParams.numSpatialSamples = m_NumSpatialSamples;
+		m_GIConstants.spatialResamplingParams.spatialSamplingRadius = m_SpatialSamplingRadius;
 
 		// Final shading
-		m_GIConstants.finalShadingParams.enableFinalVisibility = 1;
-		m_GIConstants.finalShadingParams.enableFinalMIS = 0;
+		m_GIConstants.finalShadingParams.enableFinalVisibility = m_EnableFinalVisibility ? 1 : 0;
+		m_GIConstants.finalShadingParams.enableFinalMIS = m_EnableFinalMIS ? 1 : 0;
 
 		// Buffer indices: ping-pong between frames
 		// Buffer 0 = temporal output (current frame), Buffer 1 = spatial output, Buffer 2 = temporal input (previous frame)

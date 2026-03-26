@@ -49,6 +49,17 @@ namespace Pass
 		bool m_DirtyBindings = true;
 		bool m_Enabled = true;
 
+		// User-configurable parameters (from Settings)
+		bool m_EnableTemporalResampling = true;
+		bool m_EnableBoilingFilter = true;
+		float m_BoilingFilterStrength = 0.2f;
+		uint32_t m_MaxHistoryLength = 20;
+		uint32_t m_NumSpatialSamples = 3;
+		float m_SpatialSamplingRadius = 32.0f;
+		bool m_EnableFinalVisibility = true;
+		bool m_EnableFinalMIS = false;
+		bool m_DenoisingEnabled = true;  // Write GI output to StablePlanesBuffer when true
+
 		static constexpr uint32_t RESERVOIR_BUFFER_COUNT = 3; // Triple buffering for temporal + spatial
 		static constexpr uint32_t PACKED_RESERVOIR_SIZE = 32; // sizeof(PackedGIReservoir)
 		static constexpr uint32_t RESERVOIR_BLOCK_SIZE = 16;
@@ -59,6 +70,8 @@ namespace Pass
 		virtual void CreatePipeline() override;
 
 		virtual void ResolutionChanged(uint2 resolution) override;
+
+		virtual void SettingsChanged(const Settings& settings) override;
 
 		virtual void Execute(nvrhi::ICommandList* commandList) override;
 
