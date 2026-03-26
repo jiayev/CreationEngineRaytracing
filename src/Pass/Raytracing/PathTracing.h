@@ -11,6 +11,7 @@
 #include "Pass/Raytracing/Common/SceneTLAS.h"
 #include "Pass/Raytracing/Common/LightTLAS.h"
 #include "Pass/Raytracing/Common/SHaRC.h"
+#include "Pass/Raytracing/ReSTIRGI.h"
 
 #include "Types/ShaderDefine.h"
 
@@ -48,12 +49,14 @@ namespace Pass
 
 		SHaRC* m_SHaRC;
 
+		ReSTIRGI* m_ReSTIRGI = nullptr;
+
 		eastl::vector<ShaderDefine> m_Defines;
 
 		bool m_DirtyBindings = true;
 		bool m_UseStablePlanes = true;  // Toggle for stable planes vs reference mode
 	public:
-		PathTracing(Renderer* renderer, SceneTLAS* m_SceneTLAS, SHaRC* sharc);
+		PathTracing(Renderer* renderer, SceneTLAS* m_SceneTLAS, SHaRC* sharc, ReSTIRGI* restirGI = nullptr);
 
 		void OnTLASResized([[maybe_unused]] TopLevelAS& tlas) override
 		{

@@ -647,6 +647,14 @@ void Main()
         float3 throughputDelta = float3(1.0f, 1.0f, 1.0f);
 #endif        
         
+#if PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
+        // ReSTIR GI: clear secondary surface storage for this pixel
+        ReSTIRGI_Clear(idx);
+        bool restirGI_capturedScatterPdf = false;
+        bool restirGI_capturedSecondary = false;
+        float3 restirGI_throughputAtScatter = float3(1, 1, 1);
+#endif
+        
         [loop]
         for (uint j = 0; j < MAX_BOUNCES; j++)
         {
@@ -673,6 +681,16 @@ void Main()
                 direction = bsdfSample.wo;
             else
                 break;
+
+#if PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
+            // ReSTIR GI: capture scatter PDF at first non-delta bounce
+            if (!restirGI_capturedScatterPdf && !isDelta && isValid)
+            {
+                ReSTIRGI_StorePrimarySurfaceScatterPdf(idx, bsdfSample.pdf);
+                restirGI_capturedScatterPdf = true;
+                restirGI_throughputAtScatter = throughput;
+            }
+#endif
 
             throughput *= bsdfSample.isLobe(LobeType::Transmission) ? 1.f : surface.AO;
 
@@ -780,6 +798,12 @@ void Main()
                     float specAvg = isSpecular ? Color::RGBToLuminance(skyIrradiance * throughput) : 0;
                     fillPathL += float4(skyIrradiance * throughput, specAvg);
                 }
+                // ReSTIR GI: accumulate sky radiance at secondary surface
+                if (restirGI_capturedSecondary)
+                {
+                    float3 relThp = throughput / max(restirGI_throughputAtScatter, 1e-6);
+                    ReSTIRGI_AddSecondarySurfaceRadiance(idx, skyIrradiance * relThp);
+                }
 #else
                 sampleRadiance += skyIrradiance * throughput;
 #endif                
@@ -789,6 +813,15 @@ void Main()
             float3 localPosition = ray.Origin + direction * payload.hitDistance;
 
             surface = SurfaceMaker::make(localPosition, payload, direction, rayCone, instance, material, false);
+
+#if PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
+            // ReSTIR GI: capture secondary surface position and normal at first hit after scatter
+            if (restirGI_capturedScatterPdf && !restirGI_capturedSecondary)
+            {
+                ReSTIRGI_StoreSecondarySurfacePositionAndNormal(idx, surface.Position, surface.Normal);
+                restirGI_capturedSecondary = true;
+            }
+#endif
 
             // Pass through Effect materials in bounce: accumulate emissive, continue ray unchanged
             bool effectMiss = false;
@@ -837,6 +870,12 @@ void Main()
                     float specAvg = isSpecular ? Color::RGBToLuminance(skyIrradiance * throughput) : 0;
                     fillPathL += float4(skyIrradiance * throughput, specAvg);
                 }
+                // ReSTIR GI: accumulate effect-miss sky
+                if (restirGI_capturedSecondary)
+                {
+                    float3 relThp = throughput / max(restirGI_throughputAtScatter, 1e-6);
+                    ReSTIRGI_AddSecondarySurfaceRadiance(idx, skyIrradiance * relThp);
+                }
 #else
                 sampleRadiance += skyIrradiance * throughput;
 #endif
@@ -873,6 +912,12 @@ void Main()
                 {
                     float specAvg = isSpecular ? Color::RGBToLuminance(sharcRadiance * throughput) : 0;
                     fillPathL += float4(sharcRadiance * throughput, specAvg);
+                }
+                // ReSTIR GI: accumulate SHaRC cached radiance
+                if (restirGI_capturedSecondary)
+                {
+                    float3 relThp = throughput / max(restirGI_throughputAtScatter, 1e-6);
+                    ReSTIRGI_AddSecondarySurfaceRadiance(idx, sharcRadiance * relThp);
                 }
 #else
                 sampleRadiance += sharcRadiance * throughput;
@@ -927,11 +972,24 @@ void Main()
                 float specAvg = isSpecular ? Color::RGBToLuminance(directRadiance * throughput) : 0;
                 fillPathL += float4(directRadiance * throughput, specAvg);
             }
+            // ReSTIR GI: accumulate secondary surface radiance (radiance at secondary hit viewpoint)
+            if (restirGI_capturedSecondary && any(directRadiance > 0))
+            {
+                // Relative throughput from scatter to current bounce
+                float3 relThp = throughput / max(restirGI_throughputAtScatter, 1e-6);
+                ReSTIRGI_AddSecondarySurfaceRadiance(idx, directRadiance * relThp);
+            }
             // Emissive: gated by OnBranch (BUILD already captured emissive along delta paths)
             if (!fillState.hasFlag(kStablePlaneFlag_OnBranch) && any(surface.Emissive > 0))
             {
                 float specAvg = isSpecular ? Color::RGBToLuminance(surface.Emissive * throughput) : 0;
                 fillPathL += float4(surface.Emissive * throughput, specAvg);
+                // ReSTIR GI: also accumulate emissive at secondary surface
+                if (restirGI_capturedSecondary)
+                {
+                    float3 relThp = throughput / max(restirGI_throughputAtScatter, 1e-6);
+                    ReSTIRGI_AddSecondarySurfaceRadiance(idx, surface.Emissive * relThp);
+                }
             }
 #elif defined(SHARC) && SHARC_UPDATE
             sampleRadiance += directRadiance * throughput;

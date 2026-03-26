@@ -20,6 +20,7 @@
 #include "Pass/GIComposite.h"
 #include "Pass/Raytracing/GBuffer.h"
 #include "Pass/Raytracing/PathTracing.h"
+#include "Pass/Raytracing/ReSTIRGI.h"
 #include "Pass/Raster/GBuffer.h"
 
 Scene::Scene()
@@ -130,14 +131,30 @@ RenderNode* Scene::GetPathTracing()
 			)
 		});
 
+		// Create ReSTIRGI pass first (PathTracing needs its texture pointers for binding)
+		auto restirGIPass = eastl::make_unique<Pass::ReSTIRGI>(
+			renderer,
+			m_PathTracing->GetPass<Pass::SceneTLAS>()
+		);
+		auto* restirGIPtr = restirGIPass.get();
+
+		// PathTracing runs before ReSTIRGI — it fills secondary surface textures
 		m_PathTracing->AddNode({
 			true,
 			"PathTracing",
 			eastl::make_unique<Pass::PathTracing>(
 				renderer,
 				m_PathTracing->GetPass<Pass::SceneTLAS>(),
-				m_PathTracing->GetPass<Pass::SHaRC>()
+				m_PathTracing->GetPass<Pass::SHaRC>(),
+				restirGIPtr
 			)
+		});
+
+		// ReSTIRGI runs after PathTracing — reads secondary surface data, performs resampling
+		m_PathTracing->AddNode({
+			true,
+			"ReSTIRGI",
+			eastl::move(restirGIPass)
 		});
 	}
 

@@ -4,8 +4,8 @@
 
 namespace Pass
 {
-	PathTracing::PathTracing(Renderer* renderer, SceneTLAS* sceneTLAS, SHaRC* sharc)
-		: RenderPass(renderer), m_SceneTLAS(sceneTLAS), m_SHaRC(sharc)
+	PathTracing::PathTracing(Renderer* renderer, SceneTLAS* sceneTLAS, SHaRC* sharc, ReSTIRGI* restirGI)
+		: RenderPass(renderer), m_SceneTLAS(sceneTLAS), m_SHaRC(sharc), m_ReSTIRGI(restirGI)
 	{
 		m_LinearWrapSampler = GetRenderer()->GetDevice()->createSampler(
 			nvrhi::SamplerDesc()
@@ -68,7 +68,10 @@ namespace Pass
 			// PT Motion Vectors output
 			nvrhi::BindingLayoutItem::Texture_UAV(8),            // MotionVectors (RWTexture2D<float4>)
 			// PT Depth output
-			nvrhi::BindingLayoutItem::Texture_UAV(9)             // Depth (RWTexture2D<float>)
+			nvrhi::BindingLayoutItem::Texture_UAV(9),             // Depth (RWTexture2D<float>)
+			// ReSTIR GI secondary surface storage
+			nvrhi::BindingLayoutItem::Texture_UAV(10),            // SecondarySurfacePositionNormal
+			nvrhi::BindingLayoutItem::Texture_UAV(11)             // SecondarySurfaceRadiance
 		};
 
 #if defined(NVAPI)
@@ -238,7 +241,10 @@ namespace Pass
 			// PT Motion Vectors output
 			nvrhi::BindingSetItem::Texture_UAV(8, renderer->m_PTMotionVectors),
 			// PT Depth output
-			nvrhi::BindingSetItem::Texture_UAV(9, renderer->m_PTDepth)
+			nvrhi::BindingSetItem::Texture_UAV(9, renderer->m_PTDepth),
+			// ReSTIR GI secondary surface storage
+			nvrhi::BindingSetItem::Texture_UAV(10, m_ReSTIRGI ? m_ReSTIRGI->GetSecondarySurfacePositionNormal() : nullptr),
+			nvrhi::BindingSetItem::Texture_UAV(11, m_ReSTIRGI ? m_ReSTIRGI->GetSecondarySurfaceRadiance() : nullptr)
 		};
 
 		

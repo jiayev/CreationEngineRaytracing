@@ -46,6 +46,11 @@ RWTexture2D<float4>                         MotionVectors               : regist
 RWTexture2D<float>                          Depth                       : register(u9);
 #endif
 
+// ReSTIR GI secondary surface storage (written by FILL pass)
+#ifndef NON_PATH_TRACING_PASS
+#include "raytracing/include/ReSTIRGIBindings.hlsli"
+#endif
+
 RaytracingAccelerationStructure             Scene                       : register(t0);
 Texture2D<float4>                           SkyHemisphere               : register(t1);
 Texture2D<float4>                           WaterFlowMap                : register(t2);
