@@ -14,7 +14,11 @@ RWTexture2D<float4> u_SecondarySurfaceRadiance       : register(u11);
 float2 _ReSTIR_OctEncode(float3 n)
 {
     n /= (abs(n.x) + abs(n.y) + abs(n.z));
-    n.xy = n.z >= 0.0 ? n.xy : (1.0 - abs(n.yx)) * (n.xy >= 0.0 ? 1.0 : -1.0);
+    if (n.z < 0.0)
+    {
+        float2 octSign = float2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
+        n.xy = (1.0 - abs(n.yx)) * octSign;
+    }
     return n.xy * 0.5 + 0.5;
 }
 

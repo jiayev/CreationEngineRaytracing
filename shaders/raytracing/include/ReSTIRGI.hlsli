@@ -8,6 +8,69 @@
 
 #include "interop/ReSTIRGIData.hlsli"
 
+#ifndef NDIRTOOCT_DEFINED
+#define NDIRTOOCT_DEFINED
+
+float2 _ReSTIR_OctEncode(float3 n)
+{
+    n /= (abs(n.x) + abs(n.y) + abs(n.z));
+    if (n.z < 0.0)
+    {
+        float2 octSign = float2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
+        n.xy = (1.0 - abs(n.yx)) * octSign;
+    }
+    return n.xy * 0.5 + 0.5;
+}
+
+float3 _ReSTIR_OctDecode(float2 f)
+{
+    f = f * 2.0 - 1.0;
+    float3 n = float3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+    float t = saturate(-n.z);
+    n.x += (n.x >= 0.0) ? -t : t;
+    n.y += (n.y >= 0.0) ? -t : t;
+    return normalize(n);
+}
+
+uint ReSTIR_NDirToOctUnorm32(float3 n)
+{
+    float2 p = _ReSTIR_OctEncode(n);
+    return uint(saturate(p.x) * 0xFFFE) | (uint(saturate(p.y) * 0xFFFE) << 16);
+}
+
+float3 ReSTIR_OctToNDirUnorm32(uint pUnorm)
+{
+    float2 p;
+    p.x = saturate(float(pUnorm & 0xFFFF) / float(0xFFFE));
+    p.y = saturate(float(pUnorm >> 16) / float(0xFFFE));
+    return _ReSTIR_OctDecode(p);
+}
+
+#endif // NDIRTOOCT_DEFINED
+
+#ifndef RESTIRGI_RANDOM_HELPERS_DEFINED
+#define RESTIRGI_RANDOM_HELPERS_DEFINED
+
+uint InitRandomSeed(uint2 coord, uint2 size, uint frameCount)
+{
+    return coord.x + coord.y * size.x + frameCount * 719393;
+}
+
+uint PCGHash(uint seed)
+{
+    uint state = seed * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float Random(inout uint seed)
+{
+    seed = PCGHash(seed);
+    return float(seed) / 4294967296.0;
+}
+
+#endif // RESTIRGI_RANDOM_HELPERS_DEFINED
+
 // ============================================================================
 // Constants
 // ============================================================================

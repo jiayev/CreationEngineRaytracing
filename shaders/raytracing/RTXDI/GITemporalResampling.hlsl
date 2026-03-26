@@ -14,6 +14,9 @@
 #include "raytracing/include/ReSTIRGI.hlsli"
 
 // Random number generation (from Common.hlsli)
+#ifndef RESTIRGI_RANDOM_HELPERS_DEFINED
+#define RESTIRGI_RANDOM_HELPERS_DEFINED
+
 uint InitRandomSeed(uint2 coord, uint2 size, uint frameCount)
 {
     return coord.x + coord.y * size.x + frameCount * 719393;
@@ -31,6 +34,8 @@ float Random(inout uint seed)
     seed = PCGHash(seed);
     return float(seed) / 4294967296.0;
 }
+
+#endif // RESTIRGI_RANDOM_HELPERS_DEFINED
 
 // ----- Resources -----
 
