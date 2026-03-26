@@ -156,7 +156,14 @@ void Main(uint2 GlobalIndex : SV_DispatchThreadID, uint2 LocalIndex : SV_GroupTh
 
             float finalWeight = 1.0 - initialWeight;
 
-            float3 initialRadiance = secondaryRadiance;
+            // Initial radiance uses weightSum = 1/scatterPdf (matching reference)
+            GIReservoir initialReservoir = MakeGIReservoir(secPos,
+                ReSTIR_OctToNDirUnorm32(asuint(secondaryPositionNormal.w)),
+                secondaryRadiance, primaryScatterPdf);
+            float initTpdf = EvalGITargetPdf(initialReservoir.radiance);
+            FinalizeResampling(initialReservoir, initTpdf);
+            float3 initialRadiance = initialReservoir.radiance * initialReservoir.weightSum;
+
             attenuatedRadiance = brdf * finalRadiance * finalWeight + brdf0 * initialRadiance * initialWeight;
         }
     }

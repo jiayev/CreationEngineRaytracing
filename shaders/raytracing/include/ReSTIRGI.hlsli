@@ -317,6 +317,7 @@ GIReservoir GITemporalResampling(
 {
     // Start with initial reservoir
     GIReservoir result = initialReservoir;
+    bool temporalValid = false;
 
     // Convert NDC half-space motion vector to pixel offset
     // computeMotionVector outputs: (prevNDC - currNDC) * float3(0.5, -0.5, 1)
@@ -326,47 +327,49 @@ GIReservoir GITemporalResampling(
     int2 prevPixel = int2(floor(prevPixelF));
 
     // Bounds check
-    if (prevPixel.x < 0 || prevPixel.y < 0 || prevPixel.x >= (int)frameDim.x || prevPixel.y >= (int)frameDim.y)
-        return result;
-
-    // Load temporal neighbor reservoir
-    uint2 prevReservoirPos = PixelPosToReservoirPos(prevPixel, runtimeParams.activeCheckerboardField);
-    GIReservoir temporalReservoir = LoadGIReservoir(reservoirParams, prevReservoirPos, inputBufferIndex, reservoirBuffer);
-
-    if (!temporalReservoir.isValid())
-        return result;
-
-    // Validate depth similarity
-    float prevDepth = depthTexture[prevPixel];
-    if (abs(surfaceDepth - prevDepth) > temporalParams.depthThreshold * max(surfaceDepth, prevDepth))
-        return result;
-
-    // Validate normal similarity
-    float3 prevNormal = normalRoughnessTexture[prevPixel].xyz * 2.0 - 1.0;
-    if (dot(surfaceNormal, prevNormal) < temporalParams.normalThreshold)
-        return result;
-
-    // Cap history length
-    if (temporalReservoir.M > temporalParams.maxHistoryLength)
+    if (prevPixel.x >= 0 && prevPixel.y >= 0 && prevPixel.x < (int)frameDim.x && prevPixel.y < (int)frameDim.y)
     {
-        float ratio = float(temporalParams.maxHistoryLength) / float(temporalReservoir.M);
-        temporalReservoir.weightSum *= ratio;
-        temporalReservoir.M = temporalParams.maxHistoryLength;
+        // Load temporal neighbor reservoir
+        uint2 prevReservoirPos = PixelPosToReservoirPos(prevPixel, runtimeParams.activeCheckerboardField);
+        GIReservoir temporalReservoir = LoadGIReservoir(reservoirParams, prevReservoirPos, inputBufferIndex, reservoirBuffer);
+
+        if (temporalReservoir.isValid())
+        {
+            // Validate depth similarity
+            float prevDepth = depthTexture[prevPixel];
+            bool depthOk = abs(surfaceDepth - prevDepth) <= temporalParams.depthThreshold * max(surfaceDepth, prevDepth);
+
+            // Validate normal similarity
+            float3 prevNormal = normalRoughnessTexture[prevPixel].xyz * 2.0 - 1.0;
+            bool normalOk = dot(surfaceNormal, prevNormal) >= temporalParams.normalThreshold;
+
+            if (depthOk && normalOk)
+            {
+                // Cap history length
+                if (temporalReservoir.M > temporalParams.maxHistoryLength)
+                {
+                    float ratio = float(temporalParams.maxHistoryLength) / float(temporalReservoir.M);
+                    temporalReservoir.weightSum *= ratio;
+                    temporalReservoir.M = temporalParams.maxHistoryLength;
+                }
+
+                // Cap reservoir age
+                temporalReservoir.age++;
+                if (temporalReservoir.age <= temporalParams.maxReservoirAge)
+                {
+                    // Compute target PDF for temporal sample at current surface
+                    float temporalTargetPdf = EvalGITargetPdf(temporalReservoir.radiance);
+
+                    // Merge temporal into result
+                    float rng = Random(randomSeed);
+                    UpdateReservoir(result, temporalReservoir, temporalTargetPdf, rng);
+                    temporalValid = true;
+                }
+            }
+        }
     }
 
-    // Cap reservoir age
-    temporalReservoir.age++;
-    if (temporalReservoir.age > temporalParams.maxReservoirAge)
-        return result;
-
-    // Compute target PDF for temporal sample at current surface
-    float temporalTargetPdf = EvalGITargetPdf(temporalReservoir.radiance);
-
-    // Merge temporal into result
-    float rng = Random(randomSeed);
-    UpdateReservoir(result, temporalReservoir, temporalTargetPdf, rng);
-
-    // Finalize
+    // Always finalize — critical for correct weight convention expected by spatial resampling
     float currentTargetPdf = EvalGITargetPdf(result.radiance);
     FinalizeResampling(result, currentTargetPdf);
 

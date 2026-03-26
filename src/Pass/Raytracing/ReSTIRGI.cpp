@@ -333,6 +333,10 @@ namespace Pass
 			commandList->dispatch(threadGroupSize.x, threadGroupSize.y);
 		}
 
+		// UAV barrier: temporal writes reservoir buffer, spatial reads it
+		commandList->setBufferState(m_ReservoirBuffer, nvrhi::ResourceStates::UnorderedAccess);
+		commandList->commitBarriers();
+
 		// --- 2. Spatial Resampling ---
 		{
 			nvrhi::ComputeState state;
@@ -341,6 +345,10 @@ namespace Pass
 			commandList->setComputeState(state);
 			commandList->dispatch(threadGroupSize.x, threadGroupSize.y);
 		}
+
+		// UAV barrier: spatial writes reservoir buffer, final reads it
+		commandList->setBufferState(m_ReservoirBuffer, nvrhi::ResourceStates::UnorderedAccess);
+		commandList->commitBarriers();
 
 		// --- 3. Final Shading ---
 		{

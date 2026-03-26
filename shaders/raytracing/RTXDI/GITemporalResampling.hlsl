@@ -113,7 +113,10 @@ void Main(uint2 GlobalIndex : SV_DispatchThreadID, uint2 LocalIndex : SV_GroupTh
     }
     else
     {
+        // Finalize even without temporal resampling — must match convention expected by spatial
         resultReservoir = initialReservoir;
+        float tpdf = EvalGITargetPdf(resultReservoir.radiance);
+        FinalizeResampling(resultReservoir, tpdf);
     }
 
     // Sanitize

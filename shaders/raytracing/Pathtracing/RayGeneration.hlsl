@@ -652,6 +652,7 @@ void Main()
         ReSTIRGI_Clear(idx);
         bool restirGI_capturedScatterPdf = false;
         bool restirGI_capturedSecondary = false;
+        bool restirGI_needCaptureThp = false;
         float3 restirGI_throughputAtScatter = float3(1, 1, 1);
 #endif
         
@@ -688,7 +689,7 @@ void Main()
             {
                 ReSTIRGI_StorePrimarySurfaceScatterPdf(idx, bsdfSample.pdf);
                 restirGI_capturedScatterPdf = true;
-                restirGI_throughputAtScatter = throughput;
+                restirGI_needCaptureThp = true;  // Capture throughput AFTER bsdf weight is applied
             }
 #endif
 
@@ -729,6 +730,15 @@ void Main()
             throughput *= bsdfSample.weight;
 #   endif   // !RAW_RADIANCE
 #endif  
+
+#if PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
+            // Capture throughput AFTER bsdf weight so secondary radiance excludes primary scatter BRDF
+            if (restirGI_needCaptureThp)
+            {
+                restirGI_throughputAtScatter = throughput;
+                restirGI_needCaptureThp = false;
+            }
+#endif
             
 #if defined(SHARC) && SHARC_UPDATE
             SharcSetThroughput(sharcState, throughput);
