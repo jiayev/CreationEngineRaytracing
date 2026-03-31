@@ -21,10 +21,14 @@ namespace Hooks
 
 	void Actor_Set3D::thunk(RE::Actor* a_actor, RE::NiAVObject* a_object, bool a_queue3DTasks)
 	{
-		if (!a_object)
-			Scene::GetSingleton()->GetSceneGraph()->RemoveInstance(a_actor, true);
+		// Remove old instances; release model only when 3D is being cleared entirely.
+		Scene::GetSingleton()->GetSceneGraph()->RemoveInstance(a_actor, !a_object);
 
 		func(a_actor, a_object, a_queue3DTasks);
+
+		// Re-build RT model with the new 3D (covers equipment changes that trigger a full 3D rebuild).
+		if (a_object)
+			Scene::GetSingleton()->GetSceneGraph()->CreateActorModel(a_actor, a_actor->GetName(), a_object);
 	}
 
 	void TESObjectLAND_Attach3D::thunk(RE::TESObjectLAND* oThis, bool a2)
@@ -95,6 +99,8 @@ namespace Hooks
 
 		if (auto it = dismemberReferences.find(oThis); it != dismemberReferences.end()) {
 			for (auto& mesh : it->second) {
+				if (!mesh)  // partition was skipped (e.g. zero triangles), slot is vacant
+					continue;
 				if (a_slot == mesh->slot) {
 					logger::debug("BSDismemberSkinInstance::UpdateDismemberPartion {} {} - 0x{:08X} 0x{:08X}", a_slot, a_enable, reinterpret_cast<uintptr_t>(oThis), reinterpret_cast<uintptr_t>(mesh));
 					mesh->UpdateDismember(a_enable);

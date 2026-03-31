@@ -922,9 +922,8 @@ DirtyFlags Mesh::Update()
 	if (!bsGeometryPtr)
 		return DirtyFlags::None;
 
-	// I don't know if kHidden is set on inner nodes for culling, so to be safe we check
-	if (dynamic || skinned)
-		m_PendingState.set(bsGeometryPtr->GetFlags().all(RE::NiAVObject::Flag::kHidden), State::Hidden);
+	// Track kHidden for all mesh types, including non-skinned actor geometry (e.g. bone-parented amulets).
+	m_PendingState.set(bsGeometryPtr->GetFlags().all(RE::NiAVObject::Flag::kHidden), State::Hidden);
 
 	// Store previous hidden state
 	bool wasHidden = IsHidden();

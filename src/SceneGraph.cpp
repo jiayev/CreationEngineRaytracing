@@ -797,7 +797,9 @@ void SceneGraph::CreateModelInternal(RE::TESForm* form, const char* path, RE::Ni
 
 		auto& geomFlags = pGeometry->GetFlags();
 
-		if (geomFlags.any(RE::NiAVObject::Flag::kHidden) && !skinned) {
+		// For actors, non-skinned bone-parented geometry (e.g. amulets) can be temporarily kHidden
+		// during actor 3D setup; always include actor geometry and let Update() track kHidden.
+		if (geomFlags.any(RE::NiAVObject::Flag::kHidden) && !skinned && formType != RE::FormType::ActorCharacter) {
 			logger::debug("\t\t[RT] CreateModel::TraverseScenegraphGeometries - Is Hidden");
 			return RE::BSVisit::BSVisitControl::kContinue;
 		}
