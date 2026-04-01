@@ -571,6 +571,16 @@ void SceneGraph::ReleaseTexture(ID3D11Texture2D* texture)
 {
 	std::unique_lock lock(Scene::GetSingleton()->m_SceneMutex);
 
+	// Clean up streaming texture if this was one
+	auto texIt = m_Textures.find(texture);
+	if (texIt != m_Textures.end()) {
+		auto* textureStreaming = Renderer::GetSingleton()->GetTextureStreaming();
+		if (textureStreaming && texIt->second && texIt->second->descriptorHandle) {
+			int32_t descIdx = texIt->second->descriptorHandle->Get();
+			textureStreaming->RemoveStreamingTextureByDescriptorIndex(descIdx);
+		}
+	}
+
 	m_Textures.erase(texture);
 }
 
@@ -686,6 +696,43 @@ eastl::shared_ptr<DescriptorHandle> SceneGraph::GetTextureDescriptor(ID3D11Resou
 	hr = dxgiResource->GetSharedHandle(&sharedHandle);
 
 	if (FAILED(hr) || !sharedHandle) {
+		// RTXTS: Streaming-eligible textures don't have SHARED flag.
+		// Create streaming texture directly from captured data.
+		auto* textureStreaming = Renderer::GetSingleton()->GetTextureStreaming();
+		if (textureStreaming) {
+			auto* scene = Scene::GetSingleton();
+			std::shared_ptr<RTXTS::TextureSourceData> sourceData;
+			{
+				std::lock_guard lock(scene->capturedTextureDataMutex);
+				auto capturedIt = scene->capturedTextureData.find(d3d11Texture);
+				if (capturedIt != scene->capturedTextureData.end()) {
+					sourceData = std::move(capturedIt->second);
+					scene->capturedTextureData.erase(capturedIt);
+				}
+			}
+
+			if (sourceData) {
+				nvrhi::TextureDesc streamDesc;
+				streamDesc.width = sourceData->width;
+				streamDesc.height = sourceData->height;
+				streamDesc.mipLevels = sourceData->mipLevels;
+				streamDesc.format = sourceData->format;
+				streamDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+				streamDesc.debugName = "RTXTS Streaming Texture";
+
+				auto* streamingTex = textureStreaming->CreateStreamingTexture(streamDesc, std::move(sourceData));
+				if (streamingTex && streamingTex->reservedTexture) {
+					auto [it, emplaced] = m_Textures.try_emplace(d3d11Texture, nullptr);
+					if (emplaced) {
+						it->second = eastl::make_unique<TextureReference>(
+							streamingTex->reservedTexture, m_TextureDescriptors->m_DescriptorTable.get());
+						streamingTex->textureDescriptorIndex = it->second->descriptorHandle->Get();
+						return it->second->descriptorHandle;
+					}
+				}
+			}
+		}
+
 		D3D11_TEXTURE2D_DESC desc;
 		d3d11Texture->GetDesc(&desc);
 
@@ -721,11 +768,12 @@ eastl::shared_ptr<DescriptorHandle> SceneGraph::GetTextureDescriptor(ID3D11Resou
 	auto& textureDesc = nvrhi::TextureDesc()
 		.setWidth(static_cast<uint32_t>(nativeTexDesc.Width))
 		.setHeight(nativeTexDesc.Height)
+		.setMipLevels(nativeTexDesc.MipLevels)
 		.setFormat(formatIt->second)
 		.setInitialState(nvrhi::ResourceStates::ShaderResource)
 		.setDebugName("Shared Texture [?]");
 
-	auto textureHandle = Renderer::GetSingleton()->GetDevice()->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D12_Resource, nvrhi::Object(d3d12Texture.get()), textureDesc);
+	nvrhi::TextureHandle textureHandle = Renderer::GetSingleton()->GetDevice()->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D12_Resource, nvrhi::Object(d3d12Texture.get()), textureDesc);
 
 	auto [it, emplaced] = m_Textures.try_emplace(d3d11Texture, nullptr);
 

@@ -16,6 +16,8 @@
 
 #include "include/Surface.hlsli"
 
+#include "include/RTXTS.hlsli"
+
 #if !defined(GAME_DEF)
 #   define SKYRIM
 #endif
@@ -114,6 +116,13 @@ struct SurfaceMaker
         uint baseTexWidth, baseTexHeight;
         baseTextureForLod.GetDimensions(baseTexWidth, baseTexHeight);
         surface.MipLevel += 0.5f * SafeLog2(max(1.0f, (float)baseTexWidth * (float)baseTexHeight));
+        
+        // RTXTS: Clamp mip level to minimum resident mip and record request
+        {
+            uint baseTexIdx = material.BaseTexture();
+            surface.MipLevel = RTXTSClampMipLevel(surface.MipLevel, baseTexIdx);
+            RTXTSRecordMipRequest(baseTexIdx, surface.MipLevel);
+        }
         
         surface.GeomNormal = normalWS;
         surface.GeomTangent = tangentWS;

@@ -287,10 +287,57 @@ namespace Hooks
 
 		D3D11_TEXTURE2D_DESC descCopy = *pDesc;
 
-		if (scene->shareTexture && !(pDesc->MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE))
+		bool isShared = scene->shareTexture && !(pDesc->MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE);
+
+		// RTXTS: Skip SHARED flag for streaming-eligible textures.
+		// They will use D3D12 Reserved Resources instead, avoiding double VRAM allocation.
+		bool isStreamingEligible = isShared && pInitialData &&
+			pDesc->MipLevels > 1 && pDesc->Width >= 256 && pDesc->Height >= 256 &&
+			Renderer::GetSingleton()->GetTextureStreaming() != nullptr;
+
+		if (isShared && !isStreamingEligible)
 			descCopy.MiscFlags |= D3D11_RESOURCE_MISC_SHARED;
 
-		return func(This, &descCopy, pInitialData, ppTexture2D);
+		HRESULT hr = func(This, &descCopy, pInitialData, ppTexture2D);
+
+		// RTXTS: Capture initial texture data for streaming texture creation
+		if (SUCCEEDED(hr) && isStreamingEligible && ppTexture2D && *ppTexture2D)
+		{
+			auto sourceData = std::make_shared<RTXTS::TextureSourceData>();
+			sourceData->width = pDesc->Width;
+			sourceData->height = pDesc->Height;
+			sourceData->mipLevels = pDesc->MipLevels;
+
+			// Map DXGI format to nvrhi format
+			auto formatIt = Renderer::GetFormatMapping().find(pDesc->Format);
+			if (formatIt != Renderer::GetFormatMapping().end()) {
+				sourceData->format = formatIt->second;
+
+				sourceData->mips.resize(pDesc->MipLevels);
+				bool isBC = sourceData->IsBlockCompressed();
+
+				for (uint32_t mip = 0; mip < pDesc->MipLevels; ++mip) {
+					uint32_t mipW = std::max(pDesc->Width >> mip, 1u);
+					uint32_t mipH = std::max(pDesc->Height >> mip, 1u);
+
+					sourceData->mips[mip].width = mipW;
+					sourceData->mips[mip].height = mipH;
+					sourceData->mips[mip].rowPitch = pInitialData[mip].SysMemPitch;
+
+					uint32_t numRows = isBC ? std::max((mipH + 3) / 4, 1u) : mipH;
+					uint32_t dataSize = numRows * pInitialData[mip].SysMemPitch;
+
+					sourceData->mips[mip].data.resize(dataSize);
+					if (pInitialData[mip].pSysMem)
+						std::memcpy(sourceData->mips[mip].data.data(), pInitialData[mip].pSysMem, dataSize);
+				}
+
+				std::lock_guard<std::mutex> dataLock(scene->capturedTextureDataMutex);
+				scene->capturedTextureData[*ppTexture2D] = std::move(sourceData);
+			}
+		}
+
+		return hr;
 	}
 
 	void Install()

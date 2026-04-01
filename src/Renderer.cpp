@@ -67,6 +67,10 @@ void Renderer::Initialize(RendererParams rendererParams)
 		}
 
 	m_FrameTimer = GetDevice()->createTimerQuery();
+
+	// Initialize RTXTS texture streaming
+	m_TextureStreaming = eastl::make_unique<RTXTS::TiledTextureStreaming>();
+	m_TextureStreaming->Initialize(m_NVRHIDevice);
 }
 
 void Renderer::InitDefaultTextures()
@@ -581,9 +585,20 @@ void Renderer::ExecutePasses()
 
 	m_CommandList->beginTimerQuery(m_FrameTimer);
 
+	// RTXTS: Begin frame - read back feedback, process tile mappings
+	if (m_TextureStreaming && m_TextureStreaming->IsInitialized()) {
+		m_TextureStreaming->BeginFrame(m_CommandList);
+		m_TextureStreaming->UpdateTileMappings(m_CommandList);
+	}
+
 	scene->Update(m_CommandList);
 
 	m_RenderGraph->Execute(m_CommandList);
+
+	// RTXTS: Process mip requests after rendering
+	if (m_TextureStreaming && m_TextureStreaming->IsInitialized()) {
+		m_TextureStreaming->ProcessMipRequests(m_CommandList);
+	}
 
 	scene->ClearDirtyStates();
 
@@ -626,6 +641,11 @@ void Renderer::PostExecution()
 		m_FrameTime = m_NVRHIDevice->getTimerQueryTime(m_FrameTimer) * 1000.0f;
 
 	m_FrameIndex++;
+
+	// RTXTS: End frame cleanup
+	if (m_TextureStreaming && m_TextureStreaming->IsInitialized()) {
+		m_TextureStreaming->EndFrame();
+	}
 
 	// Run garbage collection to release resources that are no longer in use
 	GetDevice()->runGarbageCollection();

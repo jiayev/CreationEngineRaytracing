@@ -10,6 +10,8 @@
 
 #include "Renderer/TextureManager.h"
 
+#include "RTXTS/TiledTextureStreaming.h"
+
 struct MessageCallback : public nvrhi::IMessageCallback
 {
 	static MessageCallback& GetInstance()
@@ -79,6 +81,8 @@ class Renderer
 	float m_FrameTime;
 
 	TextureManager m_TextureManager;
+
+	eastl::unique_ptr<RTXTS::TiledTextureStreaming> m_TextureStreaming;
 
 	eastl::unique_ptr<TextureReference> m_WhiteTexture;
 	eastl::unique_ptr<TextureReference> m_GrayTexture;
@@ -213,6 +217,8 @@ public:
 	}
 
 	inline auto& GetTextureManager() { return m_TextureManager; }
+
+	inline auto GetTextureStreaming() { return m_TextureStreaming.get(); }
 
 	inline auto& GetBlackTexture() const { return m_BlackTexture->texture; }
 

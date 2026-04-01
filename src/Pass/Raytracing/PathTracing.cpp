@@ -13,6 +13,7 @@ namespace Pass
 			.setAllFilters(true));
 
 		m_Defines = Util::Shader::GetRaytracingDefines(Scene::GetSingleton()->m_Settings, m_SHaRC != nullptr, false);
+		m_Defines.emplace_back(L"RTXTS_ENABLED", L"1");
 
 		m_SceneTLAS->GetTopLevelAS().AddListener(this);
 
@@ -30,6 +31,7 @@ namespace Pass
 		m_UseStablePlanes = settings.DebugSettings.StablePlanes;
 
 		auto defines = Util::Shader::GetRaytracingDefines(settings, m_SHaRC != nullptr, false);
+		defines.emplace_back(L"RTXTS_ENABLED", L"1");
 
 		if (defines != m_Defines) {
 			m_Defines = defines;
@@ -131,6 +133,11 @@ namespace Pass
 			sceneGraph->GetPrevPositionDescriptors()->m_Layout
 		};
 
+		// RTXTS: Add texture streaming binding layout (space 6)
+		auto* textureStreaming = GetRenderer()->GetTextureStreaming();
+		if (textureStreaming && textureStreaming->GetBindingLayout())
+			pipelineDesc.globalBindingLayouts.push_back(textureStreaming->GetBindingLayout());
+
 		pipelineDesc.maxPayloadSize = 20;
 		pipelineDesc.allowOpacityMicromaps = true;
 
@@ -189,6 +196,11 @@ namespace Pass
 			.addBindingLayout(sceneGraph->GetVertexDescriptors()->m_Layout)
 			.addBindingLayout(sceneGraph->GetTextureDescriptors()->m_Layout)
 			.addBindingLayout(sceneGraph->GetPrevPositionDescriptors()->m_Layout);
+
+		// RTXTS: Add texture streaming binding layout (space 6)
+		auto* textureStreaming = GetRenderer()->GetTextureStreaming();
+		if (textureStreaming && textureStreaming->GetBindingLayout())
+			pipelineDesc.addBindingLayout(textureStreaming->GetBindingLayout());
 
 		outPipeline = device->createComputePipeline(pipelineDesc);
 	}
@@ -279,6 +291,11 @@ namespace Pass
 			sceneGraph->GetTextureDescriptors()->m_DescriptorTable->GetDescriptorTable(),
 			sceneGraph->GetPrevPositionDescriptors()->m_DescriptorTable
 		};
+
+		// RTXTS: Add texture streaming binding set (space 6)
+		auto* textureStreaming = Renderer::GetSingleton()->GetTextureStreaming();
+		if (textureStreaming && textureStreaming->GetBindingSet())
+			bindings.push_back(textureStreaming->GetBindingSet());
 
 		auto resolution = Renderer::GetSingleton()->GetDynamicResolution();
 

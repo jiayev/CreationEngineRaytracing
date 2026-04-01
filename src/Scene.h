@@ -11,6 +11,7 @@
 #include "interop/SharedData.hlsli"
 
 #include "Types/Settings.h"
+#include "RTXTS/StreamingTexture.h"
 
 struct Scene
 {
@@ -20,6 +21,10 @@ struct Scene
 
 	std::recursive_mutex shareTextureMutex;
 	bool shareTexture = false;
+
+	// RTXTS: Captured texture initial data for streaming texture creation
+	std::mutex capturedTextureDataMutex;
+	eastl::unordered_map<ID3D11Texture2D*, std::shared_ptr<RTXTS::TextureSourceData>> capturedTextureData;
 
 	eastl::unique_ptr<RenderNode> m_GlobalIllumination;
 	eastl::unique_ptr<RenderNode> m_PathTracing;
