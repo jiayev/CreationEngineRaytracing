@@ -3,6 +3,7 @@
 
 #include "include/Common.hlsli"
 #include "include/PBR.hlsli"
+#include "raytracing/include/AdvancedSettings.hlsli"
 
 struct Subsurface
 {
@@ -49,11 +50,12 @@ struct Surface
     float3 CoatTangent;
     float3 CoatBitangent;
 
+    float3 FuzzColor;
+    float FuzzWeight;
+
 #if defined(FULL_MATERIAL)
     float3 SubsurfaceColor;
     float Thickness;
-    float3 FuzzColor;
-    float FuzzWeight;
     float GlintScreenSpaceScale;
     float GlintLogMicrofacetDensity;
     float GlintMicrofacetRoughness;
@@ -63,6 +65,10 @@ struct Surface
 #endif
 
     float MipLevel;
+    float PositionError;
+#if USE_SIA_INTERPOLATION
+    float SIAOffset; // NVIDIA SIA safe spawn offset distance
+#endif
 
     float3 Mul(float3 tangentSample)
     {

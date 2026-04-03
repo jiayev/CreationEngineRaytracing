@@ -11,6 +11,7 @@
 #include "interop/Material.hlsli"
 
 #include "include/FlowMap.hlsli"
+#include "include/Wetness.hlsli"
 
 #define LIGHTINGSETTINGS Raytracing
 #define HAIRSETTINGS Features.HairSpecular
@@ -125,6 +126,22 @@ void DefaultMaterial(inout Surface surface, in float2 texCoord0, in float4 verte
                         surface.CoatNormal, surface.CoatTangent, surface.CoatBitangent
                     );
                 }
+            }
+        }
+
+        // Fuzz (OpenPBR §3.7)
+        if (material.PBRFlags & PBR::Flags::Fuzz)
+        {
+            half4 fuzzColorWeight = material.FuzzColorWeight();
+            surface.FuzzColor = fuzzColorWeight.rgb;
+            surface.FuzzWeight = fuzzColorWeight.a;
+
+            if (material.PBRFlags & PBR::Flags::HasFeatureTexture1)
+            {
+                Texture2D fuzzTexture = Textures[NonUniformResourceIndex(material.FuzzTexture())];
+                float4 sampledFuzz = fuzzTexture.SampleLevel(DefaultSampler, texCoord0, mipLevel);
+                surface.FuzzColor *= sampledFuzz.rgb;
+                surface.FuzzWeight *= sampledFuzz.a;
             }
         }
 
@@ -412,6 +429,23 @@ void DefaultMaterial(inout Surface surface, in float2 texCoord0, in float4 verte
         }
     }
 #endif
+
+    // ---- Wetness Effects ----
+    // Apply wetness to non-water, non-eye materials
+    if (material.ShaderType != ShaderType::Water && material.Feature != Feature::kEye)
+    {
+        bool isSkinned = (material.Feature == Feature::kFaceGen || material.Feature == Feature::kHairTint);
+        Wetness::WetnessParams wetnessParams = Wetness::ComputeWetness(
+            surface.Position,
+            normalWS,
+            surface.Normal,
+            Camera.Position,
+            Camera.WaterData,
+            Features.WetnessEffects,
+            isSkinned,
+            surface.Primary);
+        Wetness::ApplyWetness(surface, wetnessParams);
+    }
 }
 
 void WaterMaterial(inout Surface surface, in float2 texCoord0, in float3 tangentWS, in float3 bitangentWS, in float handedness, in Material material)
@@ -526,6 +560,20 @@ void WaterMaterial(inout Surface surface, in float2 texCoord0, in float3 tangent
         ); 
     }
   
+    // ---- Rain ripples on water surface ----
+    if (surface.Primary && Features.WetnessEffects.Raining > 0.0 && Features.WetnessEffects.EnableRaindropFx)
+    {
+        float3 ripplePosition = surface.Position.xyz;
+        float4 raindropInfo = Wetness::GetRainDrops(
+            ripplePosition,
+            Features.WetnessEffects.Time,
+            float3(0, 0, 1),  // water geometric normal (flat, z-up)
+            1.0,              // full ripple strength on water
+            Features.WetnessEffects);
+        float3 rippleNormal = normalize(raindropInfo.xyz);
+        surface.Normal = ReorientNormal(rippleNormal, surface.Normal);
+    }
+
     surface.Tangent = normalize(tangentWS - surface.Normal * dot(tangentWS, surface.Normal));
     surface.Bitangent = cross(surface.Normal, surface.Tangent) * handedness;
     
@@ -605,7 +653,21 @@ void LandMaterial(inout Surface surface, in float2 texCoord0, in float4 vertexCo
         normalWS, tangentWS, bitangentWS,
         surface.Normal, surface.Tangent, surface.Bitangent
     );
-#endif        
+#endif
+
+    // ---- Wetness Effects ----
+    {
+        Wetness::WetnessParams wetnessParams = Wetness::ComputeWetness(
+            surface.Position,
+            normalWS,
+            surface.Normal,
+            Camera.Position,
+            Camera.WaterData,
+            Features.WetnessEffects,
+            false,
+            surface.Primary);
+        Wetness::ApplyWetness(surface, wetnessParams);
+    }
 }
 
 #endif // SURFACE_SKYRIM_HLSL

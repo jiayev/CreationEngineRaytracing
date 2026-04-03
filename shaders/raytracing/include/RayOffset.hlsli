@@ -1,6 +1,8 @@
 #ifndef RAY_OFFSET_HLSL
 #define RAY_OFFSET_HLSL
 
+#include "raytracing/include/AdvancedSettings.hlsli"
+
 // https://github.com/NVIDIAGameWorks/dxvk-remix/blob/main/src/dxvk/shaders/rtx/concept/ray/ray_utilities.h
 
 /*
@@ -101,29 +103,66 @@ float3 CalculateRayOffset(float positionError, float3 triangleNormal)
 // Computes new ray origin based on hit position to avoid self-intersections. 
 // The function assumes that the hit position has been computed by barycentric interpolation, and not from the ray t which is less accurate.
 // Described in Ray Tracing Gems, Chapter 6, "A Fast and Robust Method for Avoiding Self-Intersection" by Carsten Wächter and Nikolaus Binder.
-// float3 OffsetRay(float3 worldPosition, float3 faceNormal, bool hasTransmission = false)  // expects triangle faceNormal pointing towards the intended ray direction
-// {
-//     if (hasTransmission)
-//         faceNormal = -faceNormal;
-//     const float origin = 1.f / 16.f;
-//     const float fScale = 3.f / 65536.f;
-//     const float iScale = 3 * 256.f;
-
-//     // Per-component integer offset to bit representation of fp32 position.
-//     int3 iOff = int3(faceNormal * iScale);
-//     float3 iPos = asfloat(asint(worldPosition) + select(worldPosition < 0.f, -iOff, iOff));
-
-//     // Select per-component between small fixed offset or above variable offset depending on distance to origin.
-//     float3 fOff = faceNormal * fScale;
-//     return select(abs(worldPosition) < origin, worldPosition + fOff, iPos);
-// }
-
-float3 OffsetRay(float3 position, float3 normal, bool hasTransmission = false)
+float3 OffsetRayAlt(float3 worldPosition, float3 faceNormal, bool hasTransmission = false)  // expects triangle faceNormal pointing towards the intended ray direction
 {
-    float3 offset = CalculateRayOffset(CalculatePositionError(position), normal);
+    if (hasTransmission)
+        faceNormal = -faceNormal;
+    const float origin = 1.f / 16.f;
+    const float fScale = 3.f / 65536.f;
+    const float iScale = 3 * 256.f;
+
+    // Per-component integer offset to bit representation of fp32 position.
+    int3 iOff = int3(faceNormal * iScale);
+    float3 iPos = asfloat(asint(worldPosition) + select(worldPosition < 0.f, -iOff, iOff));
+
+    // Select per-component between small fixed offset or above variable offset depending on distance to origin.
+    float3 fOff = faceNormal * fScale;
+    return select(abs(worldPosition) < origin, worldPosition + fOff, iPos);
+}
+
+float3 OffsetRay(float3 position, float3 normal, float positionError, bool hasTransmission)
+{
+    float3 offset = CalculateRayOffset(positionError, normal);
     if (hasTransmission)
         offset = -offset;
     return position + offset;
+}
+
+float3 OffsetRay(float3 position, float3 normal, bool hasTransmission = false)
+{
+    return OffsetRay(position, normal, CalculatePositionError(position), hasTransmission);
+}
+
+// ============================================================================
+// NVIDIA Self-Intersection Avoidance (SIA) offset method
+// ============================================================================
+
+// Offset the world-space position along the world-space normal by the SIA-computed
+// safe offset. The offset value should come from SIA_SafeSpawnPoint() or
+// SIA_SafeSpawnPointSimple().
+//
+// This replaces the standard OffsetRay for SIA-computed surfaces. The offset is
+// already a tight error bound, so no additional scaling or position-error tracking
+// is needed.
+float3 OffsetRaySIA(float3 wldPosition, float3 wldNormal, float wldOffset, bool hasTransmission = false)
+{
+    float sign = hasTransmission ? -1.0f : 1.0f;
+    precise float3 p = mad(sign * wldOffset, wldNormal, wldPosition);
+    return p;
+}
+
+// Unified offset function that dispatches to the appropriate method based on
+// USE_SIA_INTERPOLATION. Call sites can use this instead of branching manually.
+//
+// When USE_SIA_INTERPOLATION=1: uses SIA offset (siaOffset parameter, ignores positionError)
+// When USE_SIA_INTERPOLATION=0: uses standard offset (positionError parameter, ignores siaOffset)
+float3 OffsetRayAuto(float3 position, float3 normal, float positionError, float siaOffset, bool hasTransmission)
+{
+#if USE_SIA_INTERPOLATION
+    return OffsetRaySIA(position, normal, siaOffset, hasTransmission);
+#else
+    return OffsetRay(position, normal, positionError, hasTransmission);
+#endif
 }
 
 #endif // RAY_OFFSET_HLSL

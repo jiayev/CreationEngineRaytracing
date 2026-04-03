@@ -169,14 +169,23 @@ StablePlaneExplorationPayload SplitDeltaPath(
     const bool prevInsideWater,
     const float3 prevWaterAbsorption,
     const bool isEnterSurface,
-    const float3 surfaceVolumeAbsorption)
+    const float3 surfaceVolumeAbsorption,
+    const float positionError
+#if USE_SIA_INTERPOLATION
+    , const float siaOffset
+#endif
+    )
 {
     StablePlaneExplorationPayload payload;
 
     payload.stableBranchID = StablePlanesAdvanceBranchID(prevBranchID, deltaLobeIndex);
     payload.vertexIndex    = prevVertexIndex + 1;
     payload.rayDir         = lobe.dir;
-    payload.rayOrigin      = OffsetRay(surfacePosition, faceNormal, lobe.transmission != 0);
+#if USE_SIA_INTERPOLATION
+    payload.rayOrigin      = OffsetRaySIA(surfacePosition, faceNormal, siaOffset, lobe.transmission != 0);
+#else
+    payload.rayOrigin      = OffsetRay(surfacePosition, faceNormal, positionError, lobe.transmission != 0);
+#endif
     payload.throughput     = prevThp * lobe.thp;
     payload.motionVectors  = prevMotionVectors;
     payload.sceneLength    = prevSceneLength;
@@ -303,6 +312,12 @@ StablePlanesHitResult StablePlanesHandleHit(
     uint waterCounters = f32tof16(clamp(waterVolumeAbsorption.y, 0, HLF_MAX)) | (f32tof16(clamp(waterVolumeAbsorption.z, 0, HLF_MAX)) << 16);
     bool isEnterSurface = dot(brdfContext.ViewDirection, surface.FaceNormal) >= 0.0;
 
+    // Coat-priority GBuffer: use coat layer properties for denoiser when coat is present
+    bool hasCoat = surface.CoatStrength > 0;
+    float  gbufferRoughness = hasCoat ? surface.CoatRoughness : surface.Roughness;
+    float3 gbufferNormal    = hasCoat ? surface.CoatNormal    : surface.Normal;
+    float3 coatTint         = lerp(float3(1,1,1), surface.CoatColor, surface.CoatStrength);
+
     float3 emissive = surface.Emissive;
     if (any(emissive > 0))
         ctx.AccumulateStableRadiance(pixelPos, emissive * throughput);
@@ -318,8 +333,8 @@ StablePlanesHitResult StablePlanesHandleHit(
             rayOrigin, rayDir, stableBranchID,
             totalSceneLength, hitDistance,
             throughput, psrMV,
-            surface.Roughness, surface.Normal,
-            surface.DiffuseAlbedo.xxx, surface.F0,
+            gbufferRoughness, gbufferNormal,
+            surface.DiffuseAlbedo.xxx * coatTint, hasCoat ? surface.CoatF0 : surface.F0,
             isDominant, waterFlags, waterCounters
         );
         if (isDominant)
@@ -356,8 +371,8 @@ StablePlanesHitResult StablePlanesHandleHit(
 
     if (nonDeltaPart > 1e-5 || activeDeltaLobes == 0)
     {
-        float3 diffBSDFEstimate = max(surface.DiffuseAlbedo, 0.04);
-        float3 specBSDFEstimate = max(surface.F0, 0.04);
+        float3 diffBSDFEstimate = max(surface.DiffuseAlbedo, 0.04) * coatTint;
+        float3 specBSDFEstimate = max(hasCoat ? surface.CoatF0 : surface.F0, 0.04);
 
         float3 psrMV; float psrDepth;
         computePSRMotionVectorsAndDepth(pixelPos, totalSceneLength, imageXform,
@@ -367,7 +382,7 @@ StablePlanesHitResult StablePlanesHandleHit(
             rayOrigin, rayDir, stableBranchID,
             totalSceneLength, hitDistance,
             throughput, psrMV,
-            surface.Roughness, surface.Normal,
+            gbufferRoughness, gbufferNormal,
             diffBSDFEstimate, specBSDFEstimate,
             isDominant, waterFlags, waterCounters
         );
@@ -403,7 +418,11 @@ StablePlanesHitResult StablePlanesHandleHit(
         {
             result.continueTracing      = true;
             result.nextRayDir           = deltaLobes[lobeIdx].dir;
-            result.nextRayOrigin        = OffsetRay(surface.Position, faceNormal, deltaLobes[lobeIdx].transmission != 0);
+#if USE_SIA_INTERPOLATION
+            result.nextRayOrigin        = OffsetRaySIA(surface.Position, faceNormal, surface.SIAOffset, deltaLobes[lobeIdx].transmission != 0);
+#else
+            result.nextRayOrigin        = OffsetRay(surface.Position, faceNormal, surface.PositionError, deltaLobes[lobeIdx].transmission != 0);
+#endif
             result.nextThp              = throughput * deltaLobes[lobeIdx].thp;
             result.nextBranchID         = StablePlanesAdvanceBranchID(stableBranchID, lobeIdx);
             result.nextVertexIndex      = vertexIndex + 1;
@@ -427,7 +446,11 @@ StablePlanesHitResult StablePlanesHandleHit(
                     surface.Position, faceNormal, deltaLobes[lobeIdx], lobeIdx,
                     stableBranchID, vertexIndex, throughput, motionVectors,
                     totalSceneLength, imageXform, roughnessAccum, -rayDir,
-                    insideWaterVolume, waterVolumeAbsorption, isEnterSurface, surface.VolumeAbsorption
+                    insideWaterVolume, waterVolumeAbsorption, isEnterSurface, surface.VolumeAbsorption,
+                    surface.PositionError
+#if USE_SIA_INTERPOLATION
+                    , surface.SIAOffset
+#endif
                 );
 
                 uint4 packed[5];
@@ -448,8 +471,8 @@ StablePlanesHitResult StablePlanesHandleHit(
             rayOrigin, rayDir, stableBranchID,
             totalSceneLength, hitDistance,
             throughput, psrMV,
-            surface.Roughness, surface.Normal,
-            max(surface.DiffuseAlbedo, 0.04), max(surface.F0, 0.04),
+            gbufferRoughness, gbufferNormal,
+            max(surface.DiffuseAlbedo, 0.04) * coatTint, max(hasCoat ? surface.CoatF0 : surface.F0, 0.04),
             storeAsDominant, waterFlags, waterCounters
         );
         if (storeAsDominant)

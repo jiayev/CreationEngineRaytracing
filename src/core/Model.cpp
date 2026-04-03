@@ -23,8 +23,9 @@ Model::Model(eastl::string name, RE::NiAVObject* node, RE::TESForm* form, eastl:
 		auto* refr = form->AsReference();
 
 		if (auto* extra = refr->extraList.GetByType<RE::ExtraEmittanceSource>()) {
-			auto* tesRegion = extra->source->As<RE::TESRegion>();
-			m_EmittanceColor = reinterpret_cast<float3*>(&tesRegion->emittanceColor);
+			if (auto* tesRegion = extra->source->As<RE::TESRegion>()) {
+				m_EmittanceColor = reinterpret_cast<float3*>(&tesRegion->emittanceColor);
+			}
 		}
 	}
 }
@@ -139,4 +140,11 @@ void Model::UpdateBLAS(nvrhi::ICommandList* commandList)
 	nvrhi::utils::BuildBottomLevelAccelStruct(commandList, blas, blasDesc);
 
 	m_LastBLASUpdate = Renderer::GetSingleton()->GetFrameIndex();
+}
+
+void Model::RemoveGeometry(RE::BSGeometry* geometry)
+{
+	meshes.erase(std::remove_if(meshes.begin(), meshes.end(), [&](auto& mesh) {
+		return mesh->bsGeometryPtr.get() == geometry;
+		}), meshes.end());
 }
