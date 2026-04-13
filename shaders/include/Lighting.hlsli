@@ -16,6 +16,10 @@
 
 #include "raytracing/include/Materials/BSDF.hlsli"
 
+#if defined(HEIGHT_FOG_PT)
+#include "include/HeightFog.hlsli"
+#endif
+
 static const float ISL_SCALE = 0.8f;
 static const float ISL_METRES_TO_UNITS = 70.f;
 static const float ISL_METRES_TO_UNITS_SQ = ISL_METRES_TO_UNITS * ISL_METRES_TO_UNITS;
@@ -112,6 +116,9 @@ float3 EvalDirectionalLight(in Material material, in Surface surface, in BRDFCon
     if (any(direct > MIN_DIFFUSE_SHADOW))
     {
         direct *= TraceRayShadow(Scene, surface, lr, randomSeed);
+#if defined(HEIGHT_FOG_PT)
+        direct *= FogShadowTransmittance(surface.Position, lr, SHADOW_RAY_TMAX);
+#endif
     }
     else
     {
@@ -268,6 +275,9 @@ float3 EvalPointLight(in Material material, in Surface surface, in BRDFContext b
 #endif
         
         direct *= TraceRayShadowFinite(LIGHT_TLAS, surface, lr, dist, randomSeed);
+#if defined(HEIGHT_FOG_PT)
+        direct *= FogShadowTransmittance(surface.Position, lr, dist);
+#endif
     }
     else
     {
@@ -320,6 +330,9 @@ float3 EvalDeltaLobeLighting(in Surface surface, in BRDFContext brdfContext, in 
                 float3 contribution = deltaThroughput * irradiance / sunSolidAngle * (isPrimary ? 1.0f : Raytracing.Directional);
                 
                 contribution *= TraceRayShadow(Scene, surface, deltaDir, randomSeed);
+#if defined(HEIGHT_FOG_PT)
+                contribution *= FogShadowTransmittance(surface.Position, deltaDir, SHADOW_RAY_TMAX);
+#endif
                 
                 totalRadiance += contribution;
             }
@@ -358,6 +371,9 @@ float3 EvalDeltaLobeLighting(in Surface surface, in BRDFContext brdfContext, in 
 #   define DELTA_LIGHT_TLAS Scene     
 #endif
                     contribution *= TraceRayShadowFinite(DELTA_LIGHT_TLAS, surface, deltaDir, dist, randomSeed);
+#if defined(HEIGHT_FOG_PT)
+                    contribution *= FogShadowTransmittance(surface.Position, deltaDir, dist);
+#endif
                     
                     totalRadiance += contribution;
                 }
@@ -388,6 +404,9 @@ void GetLightIrradianceMIS(in Instance instance, in Surface surface, out float3 
     GetPointLightIrradiance(instance.LightData, surface, pointIrradiance, pointLr, pointDist, randomSeed);
 
     float3 dirVisibility = TraceRayShadow(Scene, surface, dirLr, randomSeed);
+#if defined(HEIGHT_FOG_PT)
+    dirVisibility *= FogShadowTransmittance(surface.Position, dirLr, SHADOW_RAY_TMAX);
+#endif
 
     float pDirLight = Luminance(directionalIrradiance * dirVisibility);
     float pPointLight = Luminance(pointIrradiance);

@@ -279,6 +279,11 @@ void Scene::Initialize()
 	m_FeatureData = eastl::make_unique<FeatureData>();
 	m_FeatureBuffer = renderer->GetDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
 		sizeof(FeatureData), "Feature Data", Constants::MAX_CB_VERSIONS));
+
+	// Height Fog PT Data
+	m_HeightFogPTData = eastl::make_unique<HeightFogPTData>();
+	m_HeightFogPTBuffer = renderer->GetDevice()->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
+		sizeof(HeightFogPTData), "HeightFog PT Data", Constants::MAX_CB_VERSIONS));
 }
 
 void Scene::Execute()
@@ -300,6 +305,19 @@ void Scene::Execute()
 	commandList->writeBuffer(m_CameraBuffer, m_CameraData.get(), sizeof(CameraData));
 
 	commandList->writeBuffer(m_FeatureBuffer, m_FeatureData.get(), sizeof(FeatureData));
+
+	// Update HeightFogPT constant buffer from settings
+	{
+		const auto& fogSettings = m_Settings.HeightFogPT;
+		m_HeightFogPTData->Enabled = fogSettings.Enabled ? 1u : 0u;
+		m_HeightFogPTData->ExtinctionScale = fogSettings.ExtinctionScale;
+		m_HeightFogPTData->FogPhaseG = fogSettings.FogPhaseG;
+		m_HeightFogPTData->FogRadius = fogSettings.FogRadius;
+		m_HeightFogPTData->FogAlbedo = fogSettings.FogAlbedo;
+		m_HeightFogPTData->FogDensityClamp = fogSettings.FogDensityClamp;
+		m_HeightFogPTData->ScatterMode = fogSettings.MultiScatter ? 1u : 0u;
+	}
+	commandList->writeBuffer(m_HeightFogPTBuffer, m_HeightFogPTData.get(), sizeof(HeightFogPTData));
 
 	// Executes attached render nodes
 	renderer->GetRenderGraph()->Execute(commandList);

@@ -233,6 +233,17 @@ enum struct TextureMode : uint32_t
 	Exclusive = 1
 };
 
+struct HeightFogPTSettings
+{
+	bool Enabled = false;
+	float ExtinctionScale = 1.0f;
+	float FogPhaseG = 0.5f;
+	float FogRadius = 100000.0f;
+	float3 FogAlbedo = { 0.9f, 0.9f, 0.9f };
+	float FogDensityClamp = 8.0f;
+	bool MultiScatter = false;  // false = single scatter (transmittance only)
+};
+
 struct ExperimentalSettings
 {
 	bool PathTracingCull = false;
@@ -259,5 +270,6 @@ struct Settings
 	WaterSettings WaterSettings;
 	ExperimentalSettings ExperimentalSettings;
 	ReSTIRGISettings ReSTIRGI;
+	HeightFogPTSettings HeightFogPT;
 	DebugSettings DebugSettings;
 };

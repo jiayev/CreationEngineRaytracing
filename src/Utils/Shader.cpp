@@ -59,6 +59,9 @@ namespace Util
 			if (settings.AdvancedSettings.SSSSettings.Enabled)
 				defines.emplace_back(L"SUBSURFACE_SCATTERING");
 
+			if (settings.HeightFogPT.Enabled)
+				defines.emplace_back(L"HEIGHT_FOG_PT");
+
 			if (!sharc || (sharc && !sharcUpdate)) {
 				if (settings.AdvancedSettings.StablePlanes)
 					defines.emplace_back(L"STABLE_PLANES");

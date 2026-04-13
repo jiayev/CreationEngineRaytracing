@@ -9,6 +9,7 @@
 
 #include "interop/CameraData.hlsli"
 #include "interop/SharedData.hlsli"
+#include "interop/HeightFogPTData.hlsli"
 
 #include "Types/Settings.h"
 
@@ -31,6 +32,9 @@ struct Scene
 	eastl::unique_ptr<FeatureData> m_FeatureData;
 	bool m_DirtyFeatureData = true;
 	nvrhi::BufferHandle m_FeatureBuffer;
+
+	eastl::unique_ptr<HeightFogPTData> m_HeightFogPTData;
+	nvrhi::BufferHandle m_HeightFogPTBuffer;
 
 	ID3D12Resource* m_SkyHemisphereResource = nullptr;
 	nvrhi::TextureHandle m_SkyHemisphereTexture;
@@ -72,6 +76,8 @@ struct Scene
 	inline auto GetCameraBuffer() const { return m_CameraBuffer; }
 
 	inline auto GetFeatureBuffer() const { return m_FeatureBuffer; }
+
+	inline auto GetHeightFogPTBuffer() const { return m_HeightFogPTBuffer; }
 
 	inline bool IsPathTracingActive() const { return m_Settings.Enabled && m_Settings.GeneralSettings.Mode == Mode::PathTracing; };
 

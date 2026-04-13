@@ -14,6 +14,7 @@
 #include "interop/Instance.hlsli"
 #include "interop/Light.hlsli"
 #include "interop/SHaRCData.hlsli"
+#include "interop/HeightFogPTData.hlsli"
 
 #include "interop/SharcTypes.h"
 
@@ -21,6 +22,7 @@ ConstantBuffer<CameraData>                  Camera                      : regist
 ConstantBuffer<RaytracingData>              Raytracing                  : register(b1);
 ConstantBuffer<FeatureData>                 Features                    : register(b2);
 ConstantBuffer<SHaRCData>                   SHaRC                       : register(b3);
+ConstantBuffer<HeightFogPTData>             HeightFogPT                 : register(b4);
 
 #if defined(SHARC) && SHARC_UPDATE
 RWStructuredBuffer<uint64_t>                SharcHashEntriesBuffer      : register(u0);

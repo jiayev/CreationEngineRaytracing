@@ -20,6 +20,10 @@
 
 #include "include/Lighting.hlsli"
 
+#if defined(HEIGHT_FOG_PT)
+#include "include/HeightFog.hlsli"
+#endif
+
 #if defined(SUBSURFACE_SCATTERING)
 #include "raytracing/include/SubsurfaceLighting.hlsli"
 #endif
@@ -141,6 +145,10 @@ void Main()
         float3 buildMissThp = float3(1,1,1);
         if (Camera.IsUnderwater != 0 && any(Camera.UnderwaterAbsorption > 0.0f))
             buildMissThp *= exp(-Camera.UnderwaterAbsorption * kEnvironmentMapSceneDistance);
+#if defined(HEIGHT_FOG_PT)
+        if (IsFogEnabled())
+            buildMissThp *= FogGetTransmittance(Camera.Position.xyz, sourceDirection, 0.0f, kEnvironmentMapSceneDistance);
+#endif
         StablePlanesHandleMiss(spCtx, idx, 0, 1, 1 /* sentinel branchID */,
             Camera.Position.xyz, sourceDirection, buildMissThp, float3(0,0,0),
             identityMat, skyRad, true);
@@ -219,6 +227,10 @@ void Main()
         float3 buildMissThp = float3(1,1,1);
         if (Camera.IsUnderwater != 0 && any(Camera.UnderwaterAbsorption > 0.0f))
             buildMissThp *= exp(-Camera.UnderwaterAbsorption * kEnvironmentMapSceneDistance);
+#if defined(HEIGHT_FOG_PT)
+        if (IsFogEnabled())
+            buildMissThp *= FogGetTransmittance(Camera.Position.xyz, sourceDirection, 0.0f, kEnvironmentMapSceneDistance);
+#endif
         StablePlanesHandleMiss(spCtx, idx, 0, 1, 1,
             Camera.Position.xyz, sourceDirection, buildMissThp, float3(0,0,0),
             identityMat, skyRadiance, true);
@@ -229,7 +241,12 @@ void Main()
         return;
 #else
     #if !(defined(SHARC) && SHARC_UPDATE)
-        Output[idx] = float4(LLTrueLinearToGamma(skyRadiance), 1.0f);
+        float3 foggedSkyRadiance = skyRadiance;
+#if defined(HEIGHT_FOG_PT)
+        if (IsFogEnabled())
+            foggedSkyRadiance *= FogGetTransmittance(Camera.Position.xyz, sourceDirection, 0.0f, kEnvironmentMapSceneDistance);
+#endif
+        Output[idx] = float4(LLTrueLinearToGamma(foggedSkyRadiance), 1.0f);
         DiffuseAlbedo[idx] = float3(0.0f, 0.0f, 0.0f);
         SpecularAlbedo[idx] = float3(0.5f, 0.5f, 0.5f);
         NormalRoughness[idx] = float4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -336,6 +353,12 @@ void Main()
         if (buildInsideWater)
             buildThp *= exp(-buildWaterAbsorption * sourcePayload.hitDistance);
 
+#if defined(HEIGHT_FOG_PT)
+        // Apply height fog transmittance on primary ray (BUILD pass)
+        if (IsFogEnabled())
+            buildThp *= FogGetTransmittance(Camera.Position.xyz, sourceDirection, 0.0f, sourcePayload.hitDistance);
+#endif
+
         // Handle the primary surface through StablePlanesHandleHit
         StablePlanesHitResult hitResult = StablePlanesHandleHit(
             spCtx, idx, buildPlaneIndex, buildVertexIndex, buildBranchID,
@@ -363,6 +386,11 @@ void Main()
             // Apply water absorption for this delta path segment
             if (hitResult.nextInsideWater)
                 hitResult.nextThp *= exp(-hitResult.nextWaterAbsorption * buildPayload.hitDistance);
+
+#if defined(HEIGHT_FOG_PT)
+            if (IsFogEnabled())
+                hitResult.nextThp *= FogGetTransmittance(buildRay.Origin, buildRay.Direction, 0.0f, buildPayload.hitDistance);
+#endif
 
             if (!buildPayload.Hit())
             {
@@ -426,6 +454,11 @@ void Main()
             if (ep.insideWaterVolume)
                 ep.throughput *= exp(-ep.waterVolumeAbsorption * expPayload.hitDistance);
 
+#if defined(HEIGHT_FOG_PT)
+            if (IsFogEnabled())
+                ep.throughput *= FogGetTransmittance(expRay.Origin, expRay.Direction, 0.0f, expPayload.hitDistance);
+#endif
+
             if (!expPayload.Hit())
             {
                 float3 skyRad = SampleSky(SkyHemisphere, ep.rayDir) * Raytracing.Sky;
@@ -471,6 +504,11 @@ void Main()
                     // Apply water absorption for this continuation segment
                     if (expHitResult.nextInsideWater)
                         expHitResult.nextThp *= exp(-expHitResult.nextWaterAbsorption * contPayload.hitDistance);
+
+#if defined(HEIGHT_FOG_PT)
+                    if (IsFogEnabled())
+                        expHitResult.nextThp *= FogGetTransmittance(contRay.Origin, contRay.Direction, 0.0f, contPayload.hitDistance);
+#endif
 
                     if (!contPayload.Hit())
                     {
@@ -875,6 +913,54 @@ void Main()
             {
                 throughput *= exp(-waterVolumeAbsorption * payload.hitDistance);
             }
+
+#if defined(HEIGHT_FOG_PT)
+            // Apply height fog transmittance along this bounce segment
+            if (IsFogEnabled())
+            {
+                if (HeightFogPT.ScatterMode == 1)
+                {
+                    // Multi-scatter: attempt volumetric scatter via null-collision tracking
+                    FogScatterSample fogScat = FogSampleDistance(ray.Origin, ray.Direction, 0.0f, payload.hitDistance, randomSeed);
+                    if (fogScat.scattered)
+                    {
+                        // Scatter event before surface — redirect ray through phase function
+                        throughput *= fogScat.sigmaS / max(fogScat.sigmaT, 1e-10f);
+                        float3 scatterPos = ray.Origin + ray.Direction * fogScat.t;
+
+                        // Sample new direction from HG phase function
+                        float3 newDir = SampleHGDirection(ray.Direction, fogScat.phaseG, randomSeed);
+
+                        // Set up next ray from scatter point
+                        ray.Origin = scatterPos;
+                        ray.Direction = newDir;
+                        direction = newDir;
+                        ray.TMin = 0.0f;
+                        ray.TMax = RAY_TMAX;
+
+                        // Re-trace from scatter point
+                        payload = TraceRayStandard(Scene, ray, randomSeed);
+                        rayCone = rayCone.propagateDistance(payload.hitDistance);
+
+                        // Apply transmittance for the new segment after scatter
+                        throughput *= FogGetTransmittance(ray.Origin, ray.Direction, 0.0f, payload.hitDistance);
+
+                        if (insideWaterVolume)
+                            throughput *= exp(-waterVolumeAbsorption * payload.hitDistance);
+                    }
+                    else
+                    {
+                        // No scatter event — apply analytic transmittance for full segment
+                        throughput *= FogGetTransmittance(ray.Origin, ray.Direction, 0.0f, payload.hitDistance);
+                    }
+                }
+                else
+                {
+                    // Single-scatter: analytic transmittance only
+                    throughput *= FogGetTransmittance(ray.Origin, ray.Direction, 0.0f, payload.hitDistance);
+                }
+            }
+#endif
             
             if (isSpecular)
                 specHitDist += payload.hitDistance;
@@ -938,6 +1024,11 @@ void Main()
 
                 if (insideWaterVolume)
                     throughput *= exp(-waterVolumeAbsorption * payload.hitDistance);
+
+#if defined(HEIGHT_FOG_PT)
+                if (IsFogEnabled())
+                    throughput *= FogGetTransmittance(ray.Origin, ray.Direction, 0.0f, payload.hitDistance);
+#endif
 
                 if (!payload.Hit())
                 {
@@ -1157,6 +1248,15 @@ void Main()
         direct *= primaryWaterAttenuation;
         radiance *= primaryWaterAttenuation;
     }
+#if defined(HEIGHT_FOG_PT)
+    // Apply height fog transmittance on primary ray (camera → first hit)
+    if (IsFogEnabled())
+    {
+        float3 primaryFogTransmittance = FogGetTransmittance(Camera.Position.xyz, sourceDirection, 0.0f, primarySceneDistance);
+        direct *= primaryFogTransmittance;
+        radiance *= primaryFogTransmittance;
+    }
+#endif
     Output[idx] = float4(LLTrueLinearToGamma(direct + radiance), 1.0f);
     SpecularHitDistance[idx] = specHitDist;     
 #endif    
