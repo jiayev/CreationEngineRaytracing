@@ -929,7 +929,7 @@ void Main()
                         float3 scatterPos = ray.Origin + ray.Direction * fogScat.t;
 
                         // Sample new direction from HG phase function
-                        float3 newDir = SampleHGDirection(ray.Direction, fogScat.phaseG, randomSeed);
+                        float3 newDir = SampleHGDirection(fogScat.phaseG, ray.Direction, randomSeed);
 
                         // Set up next ray from scatter point
                         ray.Origin = scatterPos;
