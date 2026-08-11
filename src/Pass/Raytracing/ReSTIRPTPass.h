@@ -42,13 +42,13 @@ namespace Pass::Raytracing
 		SceneTLAS* m_SceneTLAS;
 
 		bool m_DirtyBindings = true;
-		bool m_Enabled = false;
 		rtxdi::ReSTIRPT_ResamplingMode m_ResamplingMode = rtxdi::ReSTIRPT_ResamplingMode::TemporalAndSpatial;
 		eastl::vector<ShaderDefine> m_Defines;
 
 	public:
 		ReSTIRPTPass(Renderer* renderer, SceneTLAS* sceneTLAS);
 
+		virtual void Initialize() override;
 		virtual void CreatePipeline() override;
 
 		virtual void ResolutionChanged(uint2 resolution) override;

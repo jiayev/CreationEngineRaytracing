@@ -22,7 +22,7 @@ INTEROP_STRUCT(RaytracingData, 16)
     float PixelConeSpreadAngle;
     float TexLODBias;
     uint NumLights;
-    uint RussianRoulette;
+    uint Pad1;
     float2 Roughness;
     float2 Metalness;
     float Emissive;
@@ -39,7 +39,7 @@ INTEROP_STRUCT(RaytracingData, 16)
     float3 WaterObjectUV;
     uint NumInstances;
     uint EnableReSTIRPT;
-    uint Pad0;
+    float ResolutionScale;
     float2 WaterDisplacementPosition;
 };
 VALIDATE_CBUFFER(RaytracingData, 16);
