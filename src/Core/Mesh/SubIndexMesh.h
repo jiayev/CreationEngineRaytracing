@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/BaseMesh.h"
+#include "Core/Mesh/BaseMesh.h"
 
 class SceneGraph;
 class SubIndexSegmentMesh;
@@ -11,7 +11,7 @@ class SubIndexSegmentMesh;
 // own BLASCluster (in SceneGraph::m_SubIndexSegmentClusters) so it gets its own BLAS,
 // InstanceData, and TLAS entry.
 //
-// SubIndexMesh itself is a BaseMesh in SceneGraph::m_DirectMeshes (for lifecycle
+// SubIndexMesh itself is a BaseMesh in SceneGraph::m_Meshes (for lifecycle
 // tracking via the existing OnDestroy / deferred-destroy flow) but is NOT a member
 // of any BLASCluster; its m_GeometryDescs is empty.
 //
@@ -78,6 +78,8 @@ public:
 	// the engine's segment flag. Segments missing from runtimeData (engine removed
 	// them) are marked SubIndexHidden.
 	void Update(nvrhi::ICommandList* commandList) override;
+
+	void CommitDirtyFlags() override;
 
 	// Destroy all K SubIndexSegmentMesh children. Used when the manager is hidden
 	// (parent not visited this frame) and when OnDestroy is called.

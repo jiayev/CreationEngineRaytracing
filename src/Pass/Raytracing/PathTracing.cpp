@@ -34,7 +34,10 @@ namespace Pass
 		m_UseRestirPT = settings.ReSTIRPT.Enabled;
 
 		m_SceneTLAS->GetTopLevelAS().AddListener(this);
+	}
 
+	void PathTracing::Initialize()
+	{
 		CreateBindingLayout();
 		CreatePipeline();
 	}
@@ -96,7 +99,8 @@ namespace Pass
 		if (settings.SHaRCSettings.Enabled)
 			globalBindingLayoutDesc.addItem(nvrhi::BindingLayoutItem::VolatileConstantBuffer(3));
 
-		const bool nrd = (settings.GeneralSettings.Denoiser == Denoiser::NRD);
+		const bool nrd = (settings.GeneralSettings.Denoiser == Denoiser::NRD_Reblur ||
+			settings.GeneralSettings.Denoiser == Denoiser::NRD_Relax);
 		const bool dlssrr = (settings.GeneralSettings.Denoiser == Denoiser::DLSS_RR);
 
 		if (nrd || dlssrr) {
@@ -258,7 +262,7 @@ namespace Pass
 
 		auto device = GetRenderer()->GetDevice();
 
-		auto* rayGenBlob = ShaderCache::GetShader(L"data/shaders/raytracing/PathTracing/RayGeneration.hlsl", defines, L"cs_6_5");
+		auto rayGenBlob = ShaderCache::GetShader(L"data/shaders/raytracing/PathTracing/RayGeneration.hlsl", defines, L"cs_6_5");
 		outShader = device->createShader({ nvrhi::ShaderType::Compute, "", "Main" }, rayGenBlob->GetBufferPointer(), rayGenBlob->GetBufferSize());
 
 		if (!outShader)
@@ -343,7 +347,8 @@ namespace Pass
 		if (settings.SHaRCSettings.Enabled)
 			bindingSetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(3, m_SHaRC->GetSHaRCConstantBuffer()));
 
-		const bool nrd = (settings.GeneralSettings.Denoiser == Denoiser::NRD);
+		const bool nrd = (settings.GeneralSettings.Denoiser == Denoiser::NRD_Reblur ||
+			settings.GeneralSettings.Denoiser == Denoiser::NRD_Relax);
 		const bool dlssrr = (settings.GeneralSettings.Denoiser == Denoiser::DLSS_RR);
 
 		if (nrd || dlssrr) {

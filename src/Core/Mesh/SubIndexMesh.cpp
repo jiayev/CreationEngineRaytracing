@@ -1,5 +1,5 @@
-#include "Core/SubIndexMesh.h"
-#include "Core/SubIndexSegmentMesh.h"
+#include "Core/Mesh/SubIndexMesh.h"
+#include "Core/Mesh/SubIndexSegmentMesh.h"
 #include "Renderer.h"
 #include "Scene.h"
 #include "SceneGraph.h"
@@ -139,11 +139,17 @@ void SubIndexMesh::Update(nvrhi::ICommandList* commandList)
 		if (!m_VisitedKeys.contains(key))
 			segMesh->SetSubIndexHidden(true);
 	}
+}
 
-	// Propagates dirty flags to the cluster and clears them
+void SubIndexMesh::CommitDirtyFlags()
+{
+	// Propagates dirty flags to the segment clusters and clears them
 	for (auto& segMesh : m_Segments) {
-		segMesh->PostUpdate();
+		segMesh->CommitDirtyFlags();
 	}
+
+	// Clear dirty flags after they've been "consumed" by the cluster
+	ClearDirtyFlags();
 }
 
 void SubIndexMesh::CreateSegment(uint32_t start, uint32_t numTris)

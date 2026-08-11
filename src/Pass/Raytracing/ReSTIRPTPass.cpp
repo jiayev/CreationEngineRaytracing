@@ -42,6 +42,11 @@ namespace Pass::Raytracing
 			nvrhi::utils::CreateVolatileConstantBufferDesc(
 				sizeof(ReSTIRPTData), "ReSTIR PT Data", Constants::MAX_CB_VERSIONS));
 
+		SettingsChanged(Scene::GetSingleton()->m_Settings);
+	}
+
+	void ReSTIRPTPass::Initialize()
+	{
 		CreateBindingLayout();
 		CreatePipeline();
 	}
@@ -87,6 +92,9 @@ namespace Pass::Raytracing
 
 	void ReSTIRPTPass::CreatePipeline()
 	{
+		if (!m_BindingLayout)
+			CreateBindingLayout();
+
 		auto device = GetRenderer()->GetDevice();
 		auto* sceneGraph = Scene::GetSingleton()->GetSceneGraph();
 
