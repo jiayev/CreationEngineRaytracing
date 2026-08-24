@@ -605,8 +605,8 @@ RAB_LightSample RAB_SamplePolymorphicLight(RAB_LightInfo lightInfo, RAB_Surface 
     if (lightInfo.lightType == RAB_LIGHT_TYPE_DIRECTIONAL)
     {
         float3 irradiance = DirLightToLinear(Raytracing.DirectionalLight.Color) *
-            EvalSkyOcclusion(SkyHemisphere, Raytracing.DirectionalLight.Vector, Features.CloudShadows.Opacity);
-        float3 lightDir = normalize(Raytracing.DirectionalLight.Vector);
+            EvalSkyOcclusion(SkyHemisphere, Raytracing.DirectionalLight.Direction, Features.CloudShadows.Opacity);
+        float3 lightDir = normalize(Raytracing.DirectionalLight.Direction);
 #if defined(PHYSICAL_SKY_TRLUT)
         irradiance *= SamplePhysicalSkyTransmittance(lightDir);
 #endif
@@ -631,13 +631,13 @@ RAB_LightSample RAB_SamplePolymorphicLight(RAB_LightInfo lightInfo, RAB_Surface 
     const bool isLinear = (light.Flags & LightFlags::LinearLight) != 0;
     light.Color = PointLightToLinear(light.Color, isLinear);
 
-    float3 toLight = light.Vector - surface.surface.Position;
+    float3 toLight = light.Position - surface.surface.Position;
     float dist = length(toLight);
     float3 lightDir = toLight / max(dist, 1e-4f);
     float lightSourceAngle = 0.005f;
-    float atten = GetAttenuation(light, dist, lightSourceAngle) * GetSpotAttenuation(light, lightDir);
+    float atten = GetAttenuation(light, lightDir, dist, lightSourceAngle);
 
-    ls.position = light.Vector;
+    ls.position = light.Position;
     ls.distance = dist;
     ls.solidAnglePdf = 1.0f;
     ls.radiance = light.Color * light.Fade * atten * Raytracing.Point;
