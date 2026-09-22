@@ -2,6 +2,7 @@
 
 #include "Core/Mesh/BaseMesh.h"
 #include "Constants.h"
+#include "Core/BLASCompactor.h"
 
 #include "Instance.hlsli"
 #include "Light.hlsli"
@@ -49,6 +50,7 @@ protected:
 	eastl::vector<uint16_t> m_GeometrySlots;
 
 	nvrhi::rt::AccelStructHandle m_BLAS;
+	std::shared_ptr<BLASCompactor::Record> m_Compaction;
 
 	eastl::string m_Name;
 
@@ -62,6 +64,7 @@ protected:
 	friend class SceneGraph;
 
 	uint32_t m_UpdateCount = 0;
+	uint64_t m_UncompactedBytes = 0;
 	uint64_t m_LastBuildFrame = Constants::INVALID_FRAME_INDEX;
 
 	// TLAS instance slot, assigned during SceneGraph::Update population
@@ -73,6 +76,7 @@ protected:
 	mutable std::mutex m_DirtyMutex;
 
 	bool m_IsValid = false;
+	bool m_RequiresUpdate = false;
 
 	virtual void UpdateTransform();
 	BuildMode DetermineBuildMode(SceneGraph* sceneGraph, uint64_t frameIndex);
@@ -82,6 +86,11 @@ protected:
 	void SetValid(bool valid) { m_IsValid = valid; }
 public:
 	explicit BLASCluster(RE::TESObjectREFR* owner);
+	bool HasBLAS() const { return m_BLAS || m_Compaction; }
+	uint64_t GetBLASDeviceAddress() const;
+	uint64_t GetBLASSize() const;
+	const auto& GetBLAS() const { return m_BLAS; }
+	const auto& GetCompaction() const { return m_Compaction; }
 
 	void AddMember(BaseMesh* mesh);
 	void RemoveMember(BaseMesh* mesh);

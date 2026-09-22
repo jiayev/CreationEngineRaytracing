@@ -233,6 +233,11 @@ nvrhi::rt::AccelStructDesc BLASCluster::MakeDesc(BuildMode mode) const
 		? nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
 		: nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
 
+	if (Renderer::GetSingleton()->GetBLASCompactor() && !m_Flags.all(Flags::Updatable) && !m_RequiresUpdate) {
+		blasDesc.buildFlags |= nvrhi::rt::AccelStructBuildFlags::AllowCompaction;
+		return blasDesc;
+	}
+
 	blasDesc.buildFlags |= (mode == BuildMode::Update
 		? nvrhi::rt::AccelStructBuildFlags::PerformUpdate
 		: nvrhi::rt::AccelStructBuildFlags::AllowUpdate);
@@ -248,11 +253,16 @@ BLASCluster::BuildMode BLASCluster::DetermineBuildMode(SceneGraph* sceneGraph, u
 	const bool hasAlpha = m_DirtyFlags.any(DirtyFlags::Alpha);
 	const bool hasUpdate = m_DirtyFlags.any(DirtyFlags::Vertex, DirtyFlags::Skin, DirtyFlags::Transform);
 	const bool isOrphan = (m_Owner == nullptr);
+	if (!firstBuild && hasUpdate)
+		m_RequiresUpdate = true;
 
-	if (firstBuild || !m_BLAS || hasMesh || hasAlpha || (!isOrphan && hasVisibility))
+	if (firstBuild || !HasBLAS() || hasMesh || hasAlpha || (!isOrphan && hasVisibility))
 		return BuildMode::Rebuild;
 
 	if (hasUpdate) {
+		if (m_Compaction)
+			return BuildMode::Rebuild;
+
 		if (m_UpdateCount >= Constants::MAX_BLAS_UPDATES_BEFORE_MAINTENANCE &&
 			sceneGraph->TryMaintenanceRebuild(frameIndex))
 			return BuildMode::Rebuild;
@@ -273,6 +283,24 @@ nvrhi::rt::InstanceDesc BLASCluster::MakeInstanceDesc() const
 		.setBLAS(m_BLAS);
 
 	return instanceDesc;
+}
+
+uint64_t BLASCluster::GetBLASDeviceAddress() const
+{
+	if (m_Compaction)
+		return m_Compaction->address;
+	if (!m_BLAS)
+		return 0;
+	if (auto* compactor = Renderer::GetSingleton()->GetBLASCompactor())
+		return compactor->GetAddress(m_BLAS);
+	return m_BLAS->getDeviceAddress();
+}
+
+uint64_t BLASCluster::GetBLASSize() const
+{
+	if (m_Compaction)
+		return m_Compaction->allocation ? m_Compaction->compactedBytes : m_Compaction->originalBytes;
+	return m_BLAS ? m_BLAS->getBufferSize() : 0;
 }
 
 void BLASCluster::BuildUpdate(nvrhi::ICommandList* commandList, SceneGraph* sceneGraph)
@@ -313,12 +341,13 @@ void BLASCluster::BuildUpdate(nvrhi::ICommandList* commandList, SceneGraph* scen
 
 	if (m_GeometryDescs.empty()) {
 		m_BLAS = nullptr;
+		m_Compaction.reset();
+		m_UncompactedBytes = 0;
 		m_LastBuildFrame = frameIndex;
 		m_DirtyFlags.reset();
 		return;
 	}
 
-	// Allocate a new accel struct on first build or when the required size grows.
 	const bool allocate = !m_BLAS;
 
 	auto blasDesc = MakeDesc(buildMode);
@@ -326,16 +355,29 @@ void BLASCluster::BuildUpdate(nvrhi::ICommandList* commandList, SceneGraph* scen
 
 	bool needsAllocation = allocate;
 	if (!needsAllocation && buildMode == BuildMode::Rebuild) {
-		auto prebuildInfo = device->getAccelStructPreBuildInfo(blasDesc);
-		needsAllocation = prebuildInfo.resultMaxSizeInBytes > m_BLAS->getBufferSize();
+		const auto previousFlags = m_BLAS->getDesc().buildFlags;
+		needsAllocation = (previousFlags & nvrhi::rt::AccelStructBuildFlags::AllowCompaction) != 0 ||
+			previousFlags != blasDesc.buildFlags;
+		if (!needsAllocation) {
+			auto prebuildInfo = device->getAccelStructPreBuildInfo(blasDesc);
+			needsAllocation = prebuildInfo.resultMaxSizeInBytes > m_BLAS->getBufferSize();
+		}
 	}
 
 	if (needsAllocation)
 		m_BLAS = device->createAccelStruct(blasDesc);
 
-	SceneDiagnostics::Note(SceneDiagnostics::Event::Build, frameIndex, reinterpret_cast<uint64_t>(this),
-		m_BLAS ? m_BLAS->getDeviceAddress() : 0, static_cast<uint64_t>(buildMode), m_Name.c_str());
 	nvrhi::utils::BuildBottomLevelAccelStruct(commandList, m_BLAS, blasDesc);
+	if (buildMode == BuildMode::Rebuild) {
+		m_UncompactedBytes = m_BLAS->getBufferSize();
+		m_Compaction.reset();
+		if ((blasDesc.buildFlags & nvrhi::rt::AccelStructBuildFlags::AllowCompaction) != 0) {
+			m_Compaction = renderer->GetBLASCompactor()->Request(m_BLAS);
+			m_BLAS = nullptr;
+		}
+	}
+	SceneDiagnostics::Note(SceneDiagnostics::Event::Build, frameIndex, reinterpret_cast<uint64_t>(this),
+		GetBLASDeviceAddress(), static_cast<uint64_t>(buildMode), m_Name.c_str());
 
 	m_DirtyFlags.reset();
 	m_LastBuildFrame = frameIndex;

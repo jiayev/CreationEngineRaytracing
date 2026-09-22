@@ -40,7 +40,7 @@ uint32_t BLASInstanceCluster::Update()
 
 void BLASInstanceCluster::AppendInstanceDescs(eastl::vector<nvrhi::rt::InstanceDesc>& outDescs) const
 {
-	if (!m_IsValid || !m_BLAS)
+	if (!m_IsValid || !HasBLAS())
 		return;
 
 	const auto& instances = m_Members.front()->AsInstancedMesh()->GetInstances();

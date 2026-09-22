@@ -39,6 +39,9 @@ endif()
 
 FetchContent_MakeAvailable(nvrhi)
 
+option(CER_VULKAN_BLAS_COMPACTION "Compact static Vulkan BLAS in CER" ON)
+target_compile_definitions(${PROJECT_NAME} PRIVATE CER_VULKAN_BLAS_COMPACTION=$<BOOL:${CER_VULKAN_BLAS_COMPACTION}>)
+
 if (NVRHI_WITH_AFTERMATH)
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

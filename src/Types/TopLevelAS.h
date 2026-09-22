@@ -11,6 +11,7 @@ class TopLevelAS
 {
 	eastl::array<nvrhi::rt::AccelStructHandle, Constants::MAX_FRAMES_IN_FLIGHT> m_Handle;
 	eastl::vector<nvrhi::rt::InstanceDesc> m_InstanceDescs;
+	eastl::array<nvrhi::BufferHandle, Constants::MAX_FRAMES_IN_FLIGHT> m_InstanceBuffers;
 	uint32_t m_NumInstances[Constants::MAX_FRAMES_IN_FLIGHT] = {0};
 
 	eastl::vector<ITLASUpdateListener*> m_Listeners;
@@ -39,6 +40,9 @@ public:
 
 	void Update(nvrhi::ICommandList* commandList, const eastl::vector<BLASCluster*>& clusters)
 	{
+		auto* renderer = Renderer::GetSingleton();
+		const auto ringSlot = renderer->GetCurrentSlot();
+		auto* compactor = renderer->GetBLASCompactor();
 		m_InstanceDescs.clear();
 		m_InstanceDescs.reserve(clusters.size());
 
@@ -46,7 +50,19 @@ public:
 			if (!cluster->Valid())
 				continue;
 
+			const auto firstInstance = m_InstanceDescs.size();
 			cluster->AppendInstanceDescs(m_InstanceDescs);
+			if (compactor) {
+				const auto address = cluster->GetBLASDeviceAddress();
+				for (size_t i = firstInstance; i < m_InstanceDescs.size(); ++i)
+					m_InstanceDescs[i].blasDeviceAddress = address;
+				if (cluster->GetBLAS()) {
+					compactor->Retain(cluster->GetBLAS());
+					commandList->setAccelStructState(cluster->GetBLAS(), nvrhi::ResourceStates::AccelStructBuildBlas);
+				}
+				if (cluster->GetCompaction())
+					compactor->Retain(cluster->GetCompaction());
+			}
 		}
 
 		auto* scene = Scene::GetSingleton();
@@ -56,8 +72,6 @@ public:
 
 		if (numInstances != topLevelInstances)
 			logger::critical("TopLevelAS::UpdateInstance - Mismatch in number of instances ({}) and TLAS instances ({}).", numInstances, topLevelInstances);
-
-		const auto ringSlot = Renderer::GetSingleton()->GetCurrentSlot();
 
 		if (!m_Handle[ringSlot] || topLevelInstances > m_NumInstances[ringSlot] - Constants::TLAS_INSTANCES_THRESHOLD) {
 			float topLevelInstancesRatio = std::ceil(topLevelInstances / static_cast<float>(Constants::TLAS_INSTANCES_STEP));
@@ -82,7 +96,23 @@ public:
 		if (markers)
 			commandList->beginMarker("TLAS Update");
 
-		commandList->buildTopLevelAccelStruct(m_Handle[ringSlot], m_InstanceDescs.data(), m_InstanceDescs.size(), nvrhi::rt::AccelStructBuildFlags::PreferFastTrace);
+		if (compactor) {
+			const uint64_t bytes = uint64_t(m_NumInstances[ringSlot]) * sizeof(nvrhi::rt::InstanceDesc);
+			auto& buffer = m_InstanceBuffers[ringSlot];
+			if (!buffer || buffer->getDesc().byteSize < bytes) {
+				buffer = renderer->GetDevice()->createBuffer(nvrhi::BufferDesc()
+					.setByteSize(bytes).setIsAccelStructBuildInput(true)
+					.enableAutomaticStateTracking(nvrhi::ResourceStates::AccelStructBuildInput)
+					.setDebugName("TLAS Instances"));
+			}
+			if (!m_InstanceDescs.empty())
+				commandList->writeBuffer(buffer, m_InstanceDescs.data(), m_InstanceDescs.size() * sizeof(nvrhi::rt::InstanceDesc));
+			compactor->Retain(buffer);
+			commandList->commitBarriers();
+			commandList->buildTopLevelAccelStructFromBuffer(m_Handle[ringSlot], buffer, 0, m_InstanceDescs.size(), nvrhi::rt::AccelStructBuildFlags::PreferFastTrace);
+		} else {
+			commandList->buildTopLevelAccelStruct(m_Handle[ringSlot], m_InstanceDescs.data(), m_InstanceDescs.size(), nvrhi::rt::AccelStructBuildFlags::PreferFastTrace);
+		}
 
 		if (markers)
 			commandList->endMarker();

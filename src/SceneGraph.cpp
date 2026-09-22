@@ -751,7 +751,7 @@ void SceneGraph::Update(nvrhi::ICommandList* commandList)
 			if (it->second->Empty()) {
 				SceneDiagnostics::Note(SceneDiagnostics::Event::ClusterRetired, Renderer::GetSingleton()->GetFrameIndex(),
 					reinterpret_cast<uint64_t>(it->second.get()),
-					it->second->m_BLAS ? it->second->m_BLAS->getDeviceAddress() : 0);
+					it->second->GetBLASDeviceAddress());
 				it = clusters.erase(it);
 			} else {
 				++it;
@@ -1049,14 +1049,25 @@ void SceneGraph::BuildClusters(nvrhi::ICommandList* commandList)
 	const auto frameIndex = Renderer::GetSingleton()->GetFrameIndex();
 	if (frameIndex <= 2 || frameIndex % 600 == 0) {
 		uint64_t bytes = 0;
+		uint64_t uncompactedBytes = 0;
 		uint32_t count = 0;
+		uint32_t compacted = 0;
+		uint32_t pendingCompaction = 0;
 		for (const auto* cluster : m_AllClusters) {
-			if (cluster->m_BLAS) {
-				bytes += cluster->m_BLAS->getBufferSize();
+			if (cluster->HasBLAS()) {
+				bytes += cluster->GetBLASSize();
+				uncompactedBytes += cluster->m_UncompactedBytes;
+				if (cluster->m_Compaction && cluster->m_Compaction->allocation)
+					++compacted;
+				else if (cluster->m_Compaction)
+					++pendingCompaction;
 				++count;
 			}
 		}
-		logger::info("[VRAM] Scene BLAS: {} allocations, {:.1f} MiB (excluding scratch and retired resources)", count, bytes / 1048576.0);
+		logger::info("[VRAM] Scene BLAS: {} structures, {} compacted, {} uncompressed static, {:.1f} MiB / {:.1f} MiB before compaction (excluding pool slack, scratch and retired resources)",
+			count, compacted, pendingCompaction, bytes / 1048576.0, uncompactedBytes / 1048576.0);
+		if (auto* compactor = Renderer::GetSingleton()->GetBLASCompactor())
+			compactor->LogStats();
 	}
 }
 

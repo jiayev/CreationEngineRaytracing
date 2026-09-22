@@ -5,6 +5,7 @@
 #include "CameraData.hlsli"
 
 #include "Core/TextureManager.h"
+#include "Core/BLASCompactor.h"
 
 #include "Types/PassTiming.h"
 
@@ -55,6 +56,7 @@ class Renderer
 	ID3D11Device5* m_NativeD3D11Device;
 
 	nvrhi::DeviceHandle m_NVRHIDevice;
+	std::unique_ptr<BLASCompactor> m_BLASCompactor;
 	winrt::com_ptr<IDXGIVkInteropDevice> m_VulkanInteropDevice;
 
 	nvrhi::CommandListHandle m_CommandList = nullptr;
@@ -70,6 +72,7 @@ class Renderer
 		nvrhi::EventQueryHandle eventQuery = nullptr;
 		uint64_t fenceValue = 0;
 		bool inFlight = false;
+		bool releaseBuildScratch = false;
 	};
 	eastl::array<FrameSlot, Constants::MAX_FRAMES_IN_FLIGHT> m_FrameSlots;
 	uint32_t m_CurrentSlot = 0;
@@ -203,6 +206,7 @@ public:
 	[[nodiscard]] std::wstring GetShaderTarget(ShaderStage a_Stage) const noexcept;
 
 	nvrhi::IDevice* GetDevice() const { return m_NVRHIDevice; }
+	BLASCompactor* GetBLASCompactor() const { return m_BLASCompactor.get(); }
 
 	void WaitForPendingExecution();
 	bool WriteDescriptorTable(nvrhi::IDescriptorTable* table, const nvrhi::BindingSetItem& item);
