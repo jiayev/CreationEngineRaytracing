@@ -5,6 +5,7 @@
 #include "Util.h"
 #include "Types/RE/RE.h"
 #include "Types/InstanceMask.h"
+#include "Utils/SceneDiagnostics.h"
 
 #include <eastl/algorithm.h>
 
@@ -332,6 +333,8 @@ void BLASCluster::BuildUpdate(nvrhi::ICommandList* commandList, SceneGraph* scen
 	if (needsAllocation)
 		m_BLAS = device->createAccelStruct(blasDesc);
 
+	SceneDiagnostics::Note(SceneDiagnostics::Event::Build, frameIndex, reinterpret_cast<uint64_t>(this),
+		m_BLAS ? m_BLAS->getDeviceAddress() : 0, static_cast<uint64_t>(buildMode), m_Name.c_str());
 	nvrhi::utils::BuildBottomLevelAccelStruct(commandList, m_BLAS, blasDesc);
 
 	m_DirtyFlags.reset();

@@ -15,6 +15,7 @@
 #include "raytracing/include/Materials/BSDF.hlsli"
 
 #include "interop/Light.hlsli"
+#include "include/PhysicalSky.hlsli"
 
 static const float ISL_SCALE = 0.8f;
 static const float ISL_METRES_TO_UNITS = 70.f;
@@ -41,6 +42,10 @@ float ShadowTerminatorTerm(float3 L, float3 N, float3 Ns)
 
 float2 EvalHemiUV(float3 dir)
 {
+#if defined(SKYRIM)
+    if (Features.PhysicalSky.enabled)
+        return float2(atan2(dir.y, dir.x) / (2.0 * K_PI) + 0.5, acos(clamp(dir.z, -1.0, 1.0)) / K_PI);
+#endif
     dir.z = max(dir.z, 0.0f);
 
     float r = sqrt(1.0f - dir.z);
@@ -104,12 +109,20 @@ void EvalLight(in float3 l, in uint16_t type, in uint16_t feature, in Surface su
 #endif
 }
 
-void GetDirectionalLightIrradiance(out float3 irradiance, out float3 lr, inout uint randomSeed)
+void GetDirectionalLightIrradiance(float3 position, out float3 irradiance, out float3 lr, inout uint randomSeed)
 {
     irradiance = DirLightToLinear(DIRECTIONAL_LIGHT.Color) * EvalSkyOcclusion(SKY_HEMI, DIRECTIONAL_LIGHT.Direction, Features.CloudShadows.Opacity);
 
+#if defined(SKYRIM) && defined(PHYSICAL_SKY_RESOURCES)
+    irradiance *= SamplePhysicalSkyTransmittance(position, DIRECTIONAL_LIGHT.Direction);
+#endif
+
     // Sun angular radius is ~0.00465 radians (~0.266 degrees)
     float cosSunDisk = cos(0.00465f);
+#if defined(SKYRIM) && defined(PHYSICAL_SKY_RESOURCES)
+    if (Features.PhysicalSky.enabled && Features.PhysicalSky.sunDiskCos > 0.0)
+        cosSunDisk = Features.PhysicalSky.sunDiskCos;
+#endif
     lr = TangentToWorld(DIRECTIONAL_LIGHT.Direction, SampleConeUniform(randomSeed, cosSunDisk));
 
     // Correct MC weight for uniform cone sampling of a finite-size disk light.
@@ -121,7 +134,7 @@ float3 EvalDirectionalLight(in uint16_t type, in uint16_t feature, in Surface su
 {
     float3 irradiance;
     float3 lr;
-    GetDirectionalLightIrradiance(irradiance, lr, randomSeed);
+    GetDirectionalLightIrradiance(surface.Position, irradiance, lr, randomSeed);
     float3 direct = EvalLight(lr, type, feature, surface, brdfContext, bsdf) * irradiance;
     [branch]
     if (any(direct > MIN_DIFFUSE_SHADOW))
@@ -140,7 +153,7 @@ void EvalDirectionalLight(in uint16_t type, in uint16_t feature, in Surface surf
 {
     float3 irradiance;
     float3 lr;
-    GetDirectionalLightIrradiance(irradiance, lr, randomSeed);
+    GetDirectionalLightIrradiance(surface.Position, irradiance, lr, randomSeed);
     EvalLight(lr, type, feature, surface, brdfContext, bsdf, outDiffuse, outSpecular);
     outDiffuse *= irradiance;
     outSpecular *= irradiance;
@@ -427,8 +440,16 @@ float3 EvalDeltaLobeLighting(in Surface surface, in BRDFContext brdfContext, in 
             const float3 sunDir = DIRECTIONAL_LIGHT.Direction;            
             float3 irradiance = DirLightToLinear(DIRECTIONAL_LIGHT.Color) * EvalSkyOcclusion(SKY_HEMI, sunDir, Features.CloudShadows.Opacity);
 
+#if defined(SKYRIM) && defined(PHYSICAL_SKY_RESOURCES)
+            irradiance *= SamplePhysicalSkyTransmittance(surface.Position, sunDir);
+#endif
+
             // Sun angular radius ~0.00465 radians. Check if delta direction is within the sun disk.
             float cosSunDisk = cos(0.00465f);
+#if defined(SKYRIM) && defined(PHYSICAL_SKY_RESOURCES)
+            if (Features.PhysicalSky.enabled && Features.PhysicalSky.sunDiskCos > 0.0)
+                cosSunDisk = Features.PhysicalSky.sunDiskCos;
+#endif
             float cosDelta = dot(deltaDir, sunDir);
 
             if (cosDelta >= cosSunDisk)
@@ -514,7 +535,7 @@ void GetLightIrradianceMIS(in Instance instance, in Surface surface, out float3 
 {
     float3 directionalIrradiance;
     float3 dirLr;
-    GetDirectionalLightIrradiance(directionalIrradiance, dirLr, randomSeed);
+    GetDirectionalLightIrradiance(surface.Position, directionalIrradiance, dirLr, randomSeed);
 
     float3 pointIrradiance;
     float3 pointLr;

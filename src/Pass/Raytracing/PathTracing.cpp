@@ -74,6 +74,8 @@ namespace Pass
 			nvrhi::BindingLayoutItem::VolatileConstantBuffer(1),
 			nvrhi::BindingLayoutItem::VolatileConstantBuffer(2),
 			nvrhi::BindingLayoutItem::RayTracingAccelStruct(0),
+			nvrhi::BindingLayoutItem::Texture_SRV(21),
+			nvrhi::BindingLayoutItem::Texture_SRV(22),
 			nvrhi::BindingLayoutItem::Texture_SRV(1),
 			nvrhi::BindingLayoutItem::Texture_SRV(2),
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV(3),
@@ -318,6 +320,8 @@ namespace Pass
 			nvrhi::BindingSetItem::ConstantBuffer(1, m_SceneTLAS->GetRaytracingBuffer()),
 			nvrhi::BindingSetItem::ConstantBuffer(2, scene->GetFeatureBuffer()),		
 			nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_SceneTLAS->GetTopLevelAS().GetHandle()),
+			nvrhi::BindingSetItem::Texture_SRV(21, scene->GetPhysicalSkyTransmittance()),
+			nvrhi::BindingSetItem::Texture_SRV(22, scene->GetPhysicalSkyCloudShadow()),
 			nvrhi::BindingSetItem::Texture_SRV(1, scene->GetSkyHemiTexture()),
 			nvrhi::BindingSetItem::Texture_SRV(2, scene->GetFlowMapTexture()),
 			nvrhi::BindingSetItem::StructuredBuffer_SRV(3, sceneGraph->GetLightBuffer()),
@@ -466,6 +470,9 @@ namespace Pass
 		{
 			// Two-pass stable planes: BUILD then FILL
 			ExecuteDispatch(commandList, m_BuildRayPipeline, m_BuildShaderTable, m_BuildComputePipeline);
+			// Identical bindings do not trigger automatic UAV barriers between BUILD and FILL.
+			commandList->setResourceStatesForBindingSet(m_BindingSets[GetRenderer()->GetCurrentSlot()]);
+			commandList->commitBarriers();
 			ExecuteDispatch(commandList, m_FillRayPipeline, m_FillShaderTable, m_FillComputePipeline);
 		}
 		else

@@ -66,6 +66,11 @@ void SetSkyHemisphere(void* skyHemi)
 	scene->SetSkyHemisphere(skyHemi);
 }
 
+bool SetPhysicalSkyResources(void* transmittance, void* cloudShadow)
+{
+	return Scene::GetSingleton()->SetPhysicalSkyResources(transmittance, cloudShadow);
+}
+
 void SetSkinDetailNormal(void* skinDetailNormal)
 {
 	auto* scene = Scene::GetSingleton();

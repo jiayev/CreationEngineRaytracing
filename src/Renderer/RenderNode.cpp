@@ -1,6 +1,7 @@
 #include "RenderNode.h"
 #include "Scene.h"
 #include "Renderer.h"
+#include "Utils/SceneDiagnostics.h"
 
 #include <chrono>
 
@@ -31,6 +32,7 @@ void RenderNode::Execute(nvrhi::ICommandList* commandList)
 	m_ExecutedThisFrame[currentSlot] = true;
 
 	if (m_RenderPass) {
+		SceneDiagnostics::Note(SceneDiagnostics::Event::PassBegin, Renderer::GetSingleton()->GetFrameIndex(), currentSlot, 0, 0, m_Name.c_str());
 		m_RenderPass->EnsureInitialized();
 
 		auto& debugSettings = Scene::GetSingleton()->m_Settings.DebugSettings;
@@ -59,5 +61,6 @@ void RenderNode::Execute(nvrhi::ICommandList* commandList)
 
 		if (debugSettings.Markers)
 			commandList->endMarker();
+		SceneDiagnostics::Note(SceneDiagnostics::Event::PassEnd, Renderer::GetSingleton()->GetFrameIndex(), currentSlot, 0, 0, m_Name.c_str());
 	}
 }

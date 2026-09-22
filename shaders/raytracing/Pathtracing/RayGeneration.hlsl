@@ -255,6 +255,13 @@ void Main()
     if (!sourcePayload.Hit())
     {
         float3 skyRadiance = SampleSky(SkyHemisphere, sourceDirection) * Raytracing.Sky + primaryEffectEmissive;
+        float primarySkyAlpha = 1.0f;
+#if defined(SKYRIM)
+        if (Features.PhysicalSky.enabled) {
+            skyRadiance = primaryEffectEmissive;
+            primarySkyAlpha = 0.0f;
+        }
+#endif
 #if PATH_TRACER_MODE == PATH_TRACER_MODE_BUILD_STABLE_PLANES
         spCtx.StartPixel(idx);
         float3x3 identityMat = float3x3(1,0,0, 0,1,0, 0,0,1);
@@ -267,11 +274,14 @@ void Main()
         spCtx.StoreFirstHitRayLengthAndClearDominantToZero(idx, kEnvironmentMapSceneDistance);
         return;
 #elif PATH_TRACER_MODE == PATH_TRACER_MODE_FILL_STABLE_PLANES
-        Output[idx] = float4(LLTrueLinearToGamma(spCtx.GetAllRadiance(idx, true)), 1.0f);
+        Output[idx] = float4(LLTrueLinearToGamma(spCtx.GetAllRadiance(idx, true)), primarySkyAlpha);
+        Depth[idx] = 1.0f;
+        NormalRoughness[idx] = float4(0.0f, 0.0f, 0.0f, 1.0f);
+        MotionVectors[idx] = 0.0f;
         return;
 #else
     #if !(defined(SHARC) && SHARC_UPDATE)
-        Output[idx] = float4(LLTrueLinearToGamma(skyRadiance), 1.0f);
+        Output[idx] = float4(LLTrueLinearToGamma(skyRadiance), primarySkyAlpha);
         NormalRoughness[idx] = float4(0.0f, 0.0f, 0.0f, 1.0f);
         
         float3 skyVirtualPos = sourceDirection * kEnvironmentMapSceneDistance;

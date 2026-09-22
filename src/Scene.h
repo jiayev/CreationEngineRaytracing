@@ -32,6 +32,10 @@ struct Scene
 	uint64_t m_LightingRevision = 0;
 	nvrhi::BufferHandle m_FeatureBuffer;
 
+	void* m_PhysicalSkyResources[2]{};
+	winrt::com_ptr<IUnknown> m_PhysicalSkyOwners[2];
+	nvrhi::TextureHandle m_PhysicalSkyTextures[2];
+
 	void* m_SkyHemisphereResource = nullptr;
 	nvrhi::TextureHandle m_SkyHemisphereTexture;
 
@@ -153,6 +157,9 @@ struct Scene
 	void UpdateFeatureData(void* data, uint32_t size);
 
 	void SetSkyHemisphere(void* skyHemi);
+	bool SetPhysicalSkyResources(void* transmittance, void* cloudShadow);
+	nvrhi::ITexture* GetPhysicalSkyTransmittance() const;
+	nvrhi::ITexture* GetPhysicalSkyCloudShadow() const;
 	void SetSkinDetailNormal(void* skinDetailNormal);
 	void SetWaterFlowMap(void* skyHemi);
 

@@ -16,6 +16,7 @@ extern "C" {
 	CERT_API uint32_t PostExecution();
 	CERT_API void UpdateFeatureData(void* data, uint32_t size);
 	CERT_API void SetSkyHemisphere(void* skyHemi);
+	CERT_API bool SetPhysicalSkyResources(void* transmittance, void* cloudShadow);
 	CERT_API void SetSkinDetailNormal(void* skinDetailNormal);
 	CERT_API void SetWaterFlowMap(void* waterFlowMap);
 	CERT_API void GetPassTimings(eastl::vector<PassTiming>&);

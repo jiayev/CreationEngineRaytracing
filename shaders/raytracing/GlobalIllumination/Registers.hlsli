@@ -76,6 +76,10 @@ Texture2D<float4>                           Textures[]                  : regist
 VK_BINDING(5, 0) TextureCube<float4>      CubeTextures[]     : register(t0, space7);
 VK_BINDING(6, 0) StructuredBuffer<float4> DynamicPositions[] : register(t0, space8);
 
+Texture2D<float4> PhysicalSkyTransmittance : register(t21);
+Texture3D<float> PhysicalSkyCloudShadow : register(t22);
+#define PHYSICAL_SKY_RESOURCES
+
 SamplerState                                DefaultSampler              : register(s0);
 SamplerState                                ClampSampler                : register(s1);
 SamplerState                                PointWrapSampler            : register(s2);

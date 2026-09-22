@@ -109,6 +109,10 @@ StructuredBuffer<uint>                      InstanceLightList           : regist
 ByteAddressBuffer                           MeshSlotRemap               : register(t19);
 ByteAddressBuffer                           PropertiesBuffer            : register(t20);
 
+Texture2D<float4> PhysicalSkyTransmittance : register(t21);
+Texture3D<float> PhysicalSkyCloudShadow : register(t22);
+#define PHYSICAL_SKY_RESOURCES
+
 SamplerState                                DefaultSampler              : register(s0);
 SamplerState                                ClampSampler                : register(s1);
 SamplerState                                PointWrapSampler            : register(s2);

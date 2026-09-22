@@ -215,6 +215,79 @@ struct SkinData
 static_assert(sizeof(SkinData) % 16 == 0);
 #endif
 
+struct PhysSkyData
+{
+	// DYNAMIC
+	float2 texDim;
+	float2 rcpTexDim;  //
+	float2 frameDim;
+	float2 rcpFrameDim;  //
+
+	float zCameraPlanet;
+	float3 sunDir;  //
+	float3 sunlightColor;
+	float trMix;  //
+	float3 masserDir;
+	float apLumMix;  //
+	float3 masserColor;
+	float apTrMix;  //
+	float3 secundaDir;
+	float sunDiskCos;  //
+	float3 secundaColor;
+
+	// GENERAL
+	uint enabled;  //
+	float pad;
+	float vanillaMix;
+
+	// WORLD
+	float zBottom;
+	float rPlanet;  //
+	float rAtmosphere;
+	float3 groundAlbedo;  //
+
+	// ATMOSPHERE
+	float2 cloudShadowRemapRange;
+
+	float aerosolFalloff;
+	float aerosolPhaseG;  //
+	float3 aerosolScatter;
+	uint halfResApShadow;  //
+	float3 aerosolAbsorption;
+
+	float rayleighFalloff;
+	float3 rayleighScatter;  //
+
+	float ozoneAltitude;  //
+	float ozoneThickness;
+	float3 ozoneAbsorption;  //
+
+	// CLOUDS (VANILLA)
+	uint enableVanillaClouds;
+	float cloudRelightMix;
+	float cloudOriginalMix;
+	float silverLiningMix;  //
+	float silverLiningSpread;
+
+	// VOLUMETRIC CLOUDS
+	uint enableVolumetricClouds;
+	float shadowVolumeRange;
+	float lowestCloudAltitude;  //
+	float highestCloudAltitude;
+	float3 volCloudScatter;  //
+	uint volCloudUseSun;
+	float3 volCloudAbsorption;  //
+	float volCloudLowBottom;
+	float volCloudLowThickness;
+
+	// SETTINGS
+	uint lightSkyStatics;
+	float skyStaticsBrightness;  //
+};
+#ifdef __cplusplus
+static_assert(sizeof(PhysSkyData) == 320);
+#endif
+
 INTEROP_STRUCT(FeatureData, 16)
 {
     CPMSettings ExtendedMaterial;
@@ -226,6 +299,7 @@ INTEROP_STRUCT(FeatureData, 16)
     ExponentialHeightFogSettings ExponentialHeightFog;
     LODBlendingSettings LODBlending;
     SkinData Skin;
+    PhysSkyData PhysicalSky;
 };
 VALIDATE_CBUFFER(FeatureData, 16);
 

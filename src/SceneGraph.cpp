@@ -5,6 +5,7 @@
 #include "Renderer.h"
 #include "Util.h"
 #include "ShaderUtils.h"
+#include "Utils/SceneDiagnostics.h"
 
 #include "Types/RE/RE.h"
 #if defined(SKYRIM)
@@ -428,6 +429,8 @@ void SceneGraph::Update(nvrhi::ICommandList* commandList)
 			}
 
 			m_PendingMeshDestroy.push_back({ eastl::move(it->second), fence });
+			SceneDiagnostics::Note(SceneDiagnostics::Event::MeshRetired, Renderer::GetSingleton()->GetFrameIndex(),
+				reinterpret_cast<uint64_t>(mesh), fence, mesh->GetMeshIndex(), mesh->GetName().c_str());
 			m_Meshes.erase(it);
 		}
 
@@ -746,6 +749,9 @@ void SceneGraph::Update(nvrhi::ICommandList* commandList)
 	auto removeEmptyClusters = [this](auto& clusters) {
 		for (auto it = clusters.begin(); it != clusters.end(); ) {
 			if (it->second->Empty()) {
+				SceneDiagnostics::Note(SceneDiagnostics::Event::ClusterRetired, Renderer::GetSingleton()->GetFrameIndex(),
+					reinterpret_cast<uint64_t>(it->second.get()),
+					it->second->m_BLAS ? it->second->m_BLAS->getDeviceAddress() : 0);
 				it = clusters.erase(it);
 			} else {
 				++it;
@@ -1000,9 +1006,45 @@ void SceneGraph::BuildClusters(nvrhi::ICommandList* commandList)
 	// mesh flag commits, and only cleared inside BuildUpdate - so non-None always means a build is
 	// needed. m_AllClusters was rebuilt in Phase G after empty clusters were dropped. The scan runs
 	// on the render thread after Phase WaitAll, so flags are not being written.
-	for (auto* cluster : m_AllClusters)
-		if (cluster->m_DirtyFlags != DirtyFlags::None)
-			cluster->BuildUpdate(commandList, this);
+	for (auto* cluster : m_AllClusters) {
+		// Omitted clusters have no remap entries and receive no GPU-composed transforms.
+		if (cluster->m_DirtyFlags == DirtyFlags::None || (!cluster->Valid() && !cluster->m_GeometryDescs.empty()))
+			continue;
+		if (SceneDiagnostics::Enabled() && cluster->Valid()) {
+			for (const auto* mesh : cluster->GetMembers()) {
+				if (mesh->IsHidden())
+					continue;
+				for (const auto& entry : mesh->GetGeometryEntries()) {
+					const auto& triangles = entry.desc.geometryData.triangles;
+					SceneDiagnostics::Record record;
+					record.frame = Renderer::GetSingleton()->GetFrameIndex();
+					record.index = entry.geometryIndex;
+					record.data[0] = reinterpret_cast<uint64_t>(cluster);
+					record.data[1] = reinterpret_cast<uint64_t>(mesh);
+					record.data[2] = mesh->GetMeshIndex();
+					if (triangles.vertexBuffer) {
+						record.data[3] = triangles.vertexBuffer->getGpuVirtualAddress() + triangles.vertexOffset;
+						record.data[4] = triangles.vertexBuffer->getDesc().byteSize > triangles.vertexOffset
+							? triangles.vertexBuffer->getDesc().byteSize - triangles.vertexOffset : 0;
+					}
+					if (triangles.indexBuffer) {
+						record.data[5] = triangles.indexBuffer->getGpuVirtualAddress() + triangles.indexOffset;
+						record.data[6] = triangles.indexBuffer->getDesc().byteSize > triangles.indexOffset
+							? triangles.indexBuffer->getDesc().byteSize - triangles.indexOffset : 0;
+					}
+					if (entry.desc.transformBuffer)
+						record.data[7] = entry.desc.transformBuffer->getGpuVirtualAddress() + entry.desc.transformBufferOffset;
+					record.data[8] = (uint64_t(triangles.vertexCount) << 32) | triangles.indexCount;
+					record.data[9] = (uint64_t(triangles.vertexStride) << 32) | static_cast<uint32_t>(mesh->GetType());
+					std::memcpy(record.transforms, mesh->GetTransform().f, sizeof(float3x4));
+					std::memcpy(record.transforms + 12, m_InstanceData[cluster->m_InstanceIndex].Transform.f, sizeof(float3x4));
+					strncpy_s(record.name, mesh->GetName().c_str(), _TRUNCATE);
+					SceneDiagnostics::Write(record);
+				}
+			}
+		}
+		cluster->BuildUpdate(commandList, this);
+	}
 
 	const auto frameIndex = Renderer::GetSingleton()->GetFrameIndex();
 	if (frameIndex <= 2 || frameIndex % 600 == 0) {

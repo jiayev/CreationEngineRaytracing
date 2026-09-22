@@ -367,13 +367,13 @@ void Scene::UpdateCameraData() const
 
 void Scene::UpdateFeatureData(void* data, uint32_t size)
 {
-	if (!data || size != sizeof(FeatureData)) {
+	if (!data || (size != sizeof(FeatureData) && size != offsetof(FeatureData, PhysicalSky))) {
 		logger::error("Feature data incoming and actual struct size mismatch: received {}, expected {}.", size, sizeof(FeatureData));
 		return;
 	}
 
-	FeatureData incoming;
-	std::memcpy(&incoming, data, sizeof(incoming));
+	FeatureData incoming{};
+	std::memcpy(&incoming, data, size);
 	const auto& previous = m_FeatureData->LinearLighting;
 	const auto& current = incoming.LinearLighting;
 	if (current.resetHistory ||
@@ -384,7 +384,15 @@ void Scene::UpdateFeatureData(void* data, uint32_t size)
 			offsetof(LinearLightingSettings, directionalLightColor) - offsetof(LinearLightingSettings, vanillaDiffuseColorMult)) != 0)
 		++m_LightingRevision;
 
-	if (std::memcmp(m_FeatureData.get(), data, sizeof(FeatureData)) == 0)
+	const auto& oldSky = m_FeatureData->PhysicalSky;
+	const auto& newSky = incoming.PhysicalSky;
+	if (oldSky.enabled != newSky.enabled ||
+		oldSky.enableVolumetricClouds != newSky.enableVolumetricClouds ||
+		oldSky.sunDiskCos != newSky.sunDiskCos || oldSky.trMix != newSky.trMix ||
+		std::memcmp(&oldSky.vanillaMix, &newSky.vanillaMix, sizeof(PhysSkyData) - offsetof(PhysSkyData, vanillaMix)) != 0)
+		++m_LightingRevision;
+
+	if (std::memcmp(m_FeatureData.get(), &incoming, sizeof(FeatureData)) == 0)
 		return;
 
 	*m_FeatureData = incoming;
@@ -458,6 +466,8 @@ void Scene::SetWaterFlowMap(void* waterFlowMap)
 void Scene::UpdateSettings(Settings settings)
 {
 	auto previousMode = m_Settings.GeneralSettings.Mode;
+	if (m_Settings.AdvancedSettings.StablePlanes != settings.AdvancedSettings.StablePlanes)
+		++m_LightingRevision;
 
 	m_Settings = settings;
 
@@ -546,3 +556,46 @@ void Scene::TryReleaseBuffer(REX::W32::ID3D11Buffer* a_buffer)
 	m_Buffers.erase(reinterpret_cast<ID3D11Buffer*>(a_buffer));
 }
 #endif
+
+bool Scene::SetPhysicalSkyResources(void* transmittance, void* cloudShadow)
+{
+	void* resources[] = { transmittance, cloudShadow };
+	if (resources[0] == m_PhysicalSkyResources[0] && resources[1] == m_PhysicalSkyResources[1])
+		return true;
+
+	auto* renderer = Renderer::GetSingleton();
+	nvrhi::TextureHandle textures[2];
+	const char* names[] = { "Physical Sky Transmittance", "Physical Sky Cloud Shadow" };
+	for (uint32_t i = 0; i < 2; ++i) {
+		if (resources[i]) {
+			textures[i] = Renderer::WrapNativeTexture(resources[i], names[i],
+				renderer->IsVulkan() ? nvrhi::ResourceStates::Unknown : nvrhi::ResourceStates::ShaderResource);
+			if (!textures[i])
+				return false;
+		}
+	}
+	if ((m_PhysicalSkyTextures[0] || m_PhysicalSkyTextures[1]) && !renderer->GetDevice()->waitForIdle())
+		return false;
+
+	for (uint32_t i = 0; i < 2; ++i) {
+		m_PhysicalSkyTextures[i] = textures[i];
+		m_PhysicalSkyOwners[i].copy_from(static_cast<IUnknown*>(resources[i]));
+		m_PhysicalSkyResources[i] = resources[i];
+	}
+	for (auto& node : renderer->GetRenderGraph()->GetNodes()) {
+		if (node.m_RenderPass)
+			node.m_RenderPass->SceneTexturesChanged();
+	}
+	++m_LightingRevision;
+	return true;
+}
+
+nvrhi::ITexture* Scene::GetPhysicalSkyTransmittance() const
+{
+	return m_PhysicalSkyTextures[0] ? m_PhysicalSkyTextures[0].Get() : Renderer::GetSingleton()->GetWhiteTexture();
+}
+
+nvrhi::ITexture* Scene::GetPhysicalSkyCloudShadow() const
+{
+	return m_PhysicalSkyTextures[1] ? m_PhysicalSkyTextures[1].Get() : Renderer::GetSingleton()->GetWhiteVolume();
+}

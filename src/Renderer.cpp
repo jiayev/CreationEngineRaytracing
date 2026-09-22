@@ -8,6 +8,7 @@
 #include "Utils/DXVKInterop.h"
 #include "Renderer/RenderNode.h"
 #include "interop/PackedSurfaceData.hlsli"
+#include "Utils/SceneDiagnostics.h"
 
 namespace
 {
@@ -258,11 +259,15 @@ void Renderer::InitDefaultTextures()
 	desc.setDimension(nvrhi::TextureDimension::TextureCube).setArraySize(6).setDebugName("Default Black Cubemap");
 	m_BlackCubemap = eastl::make_unique<TextureReference>(m_NVRHIDevice->createTexture(desc), cubemapDescriptorTable);
 
+	desc.setDimension(nvrhi::TextureDimension::Texture3D).setArraySize(1).setDepth(1).setDebugName("Default White Volume");
+	m_WhiteVolume = m_NVRHIDevice->createTexture(desc);
+
 	// Write the textures using a temporary CL
 	nvrhi::CommandListHandle commandList = GetGraphicsCommandList();
 	commandList->open();
 
 	commandList->writeTexture(m_WhiteTexture->texture, 0, 0, white, 4);
+	commandList->writeTexture(m_WhiteVolume, 0, 0, white, 4, 4);
 	commandList->writeTexture(m_GrayTexture->texture, 0, 0, gray, 4);
 	commandList->writeTexture(m_NormalTexture->texture, 0, 0, normal, 4);
 	commandList->writeTexture(m_BlackTexture->texture, 0, 0, black, 4);
@@ -628,7 +633,9 @@ nvrhi::ICommandList* Renderer::StartExecution()
 	auto& slot = m_FrameSlots[m_CurrentSlot];
 
 	if (slot.inFlight) {
+		SceneDiagnostics::Note(SceneDiagnostics::Event::WaitBegin, m_FrameIndex, m_CurrentSlot, slot.fenceValue, 0, "Frame slot");
 		device->waitEventQuery(slot.eventQuery);
+		SceneDiagnostics::Note(SceneDiagnostics::Event::WaitEnd, m_FrameIndex, m_CurrentSlot, slot.fenceValue, 0, "Frame slot");
 		RunPostExecutionForSlot(m_CurrentSlot);
 		device->resetEventQuery(slot.eventQuery);
 		slot.inFlight = false;
@@ -642,6 +649,7 @@ nvrhi::ICommandList* Renderer::StartExecution()
 		slot.eventQuery = device->createEventQuery();
 
 	m_FrameIndex++;
+	SceneDiagnostics::Note(SceneDiagnostics::Event::FrameStart, m_FrameIndex, m_CurrentSlot, m_LastSubmittedInstance);
 
 	if (!slot.commandList)
 		slot.commandList = GetGraphicsCommandList();
@@ -664,7 +672,9 @@ void Renderer::WaitForDescriptorUsers()
 
 	device->resetEventQuery(m_DescriptorUpdateQuery);
 	device->setEventQuery(m_DescriptorUpdateQuery, nvrhi::CommandQueue::Graphics, m_LastSubmittedInstance);
+	SceneDiagnostics::Note(SceneDiagnostics::Event::WaitBegin, m_FrameIndex, 0, m_LastSubmittedInstance, 0, "Descriptors");
 	device->waitEventQuery(m_DescriptorUpdateQuery);
+	SceneDiagnostics::Note(SceneDiagnostics::Event::WaitEnd, m_FrameIndex, 0, m_LastSubmittedInstance, 0, "Descriptors");
 	m_DescriptorCompletedInstance = m_LastSubmittedInstance;
 }
 
@@ -690,6 +700,7 @@ uint64_t Renderer::SubmitCommandList(nvrhi::ICommandList* commandList)
 	std::scoped_lock lock(m_ExecutionMutex);
 	SubmissionQueueLock queueLock(m_VulkanInteropDevice.get());
 	m_LastSubmittedInstance = GetDevice()->executeCommandList(commandList, nvrhi::CommandQueue::Graphics);
+	SceneDiagnostics::Note(SceneDiagnostics::Event::Submitted, m_FrameIndex, m_CurrentSlot, m_LastSubmittedInstance);
 	return m_LastSubmittedInstance;
 }
 
@@ -737,6 +748,7 @@ uint32_t Renderer::PostExecution()
 
 void Renderer::RunPostExecutionForSlot(uint32_t slot)
 {
+	SceneDiagnostics::Note(SceneDiagnostics::Event::Completed, m_FrameIndex, slot, m_FrameSlots[slot].fenceValue);
 	auto device = GetDevice();
 	auto* scene = Scene::GetSingleton();
 	const auto timings = scene->m_Settings.DebugSettings.Timings;
@@ -784,15 +796,7 @@ nvrhi::TextureHandle Renderer::WrapNativeTexture(void* nativeTexture, const char
 	desc.debugName = name;
 
 	if (renderer->IsVulkan()) {
-		auto d3d11Resource = reinterpret_cast<ID3D11Texture2D*>(nativeTexture);
-
-		D3D11_TEXTURE2D_DESC targetDesc;
-		d3d11Resource->GetDesc(&targetDesc);
-
-		desc.width = static_cast<uint32_t>(targetDesc.Width);
-		desc.height = targetDesc.Height;
-		desc.mipLevels = targetDesc.MipLevels;
-		desc.arraySize = targetDesc.ArraySize;
+		auto* d3d11Resource = static_cast<ID3D11Resource*>(nativeTexture);
 
 		winrt::com_ptr<IDXGIVkInteropSurface> interopSurface;
 		HRESULT hr = d3d11Resource->QueryInterface(__uuidof(IDXGIVkInteropSurface), interopSurface.put_void());
@@ -818,10 +822,25 @@ nvrhi::TextureHandle Renderer::WrapNativeTexture(void* nativeTexture, const char
 			return nullptr;
 		}
 
-		if (targetDesc.BindFlags & D3D11_BIND_UNORDERED_ACCESS) {
-			desc.isUAV = true;
-			//desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+		if (initialState == nvrhi::ResourceStates::Unknown) {
+			if (vkLayout == VK_IMAGE_LAYOUT_GENERAL)
+				desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+			else if (vkLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+				desc.initialState = nvrhi::ResourceStates::ShaderResource;
+			else {
+				logger::error("Renderer::WrapNativeTexture - Unsupported shared image layout {} for {}", static_cast<int>(vkLayout), name);
+				return nullptr;
+			}
 		}
+
+		desc.width = createInfo.extent.width;
+		desc.height = createInfo.extent.height;
+		desc.depth = createInfo.extent.depth;
+		desc.mipLevels = createInfo.mipLevels;
+		desc.arraySize = createInfo.arrayLayers;
+		desc.dimension = createInfo.imageType == VK_IMAGE_TYPE_3D ? nvrhi::TextureDimension::Texture3D :
+			(createInfo.arrayLayers > 1 ? nvrhi::TextureDimension::Texture2DArray : nvrhi::TextureDimension::Texture2D);
+		desc.isUAV = (createInfo.usage & VK_IMAGE_USAGE_STORAGE_BIT) != 0;
 
 		return renderer->GetDevice()->createHandleForNativeTexture(nvrhi::ObjectTypes::VK_Image, vkImage, desc);
 	}
@@ -832,7 +851,10 @@ nvrhi::TextureHandle Renderer::WrapNativeTexture(void* nativeTexture, const char
 		desc.height = targetDesc.Height;
 		desc.format = renderer->GetFormat(targetDesc.Format);
 		desc.mipLevels = targetDesc.MipLevels;
-		desc.arraySize = targetDesc.DepthOrArraySize;
+		desc.arraySize = targetDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 : targetDesc.DepthOrArraySize;
+		desc.depth = targetDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? targetDesc.DepthOrArraySize : 1;
+		desc.dimension = targetDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? nvrhi::TextureDimension::Texture3D :
+			(desc.arraySize > 1 ? nvrhi::TextureDimension::Texture2DArray : nvrhi::TextureDimension::Texture2D);
 
 		if (targetDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) {
 			desc.isUAV = true;

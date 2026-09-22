@@ -107,6 +107,7 @@ class Renderer
 	RenderTargetManager m_RenderTargetManager;
 
 	eastl::unique_ptr<TextureReference> m_WhiteTexture;
+	nvrhi::TextureHandle m_WhiteVolume;
 	eastl::unique_ptr<TextureReference> m_GrayTexture;
 	eastl::unique_ptr<TextureReference> m_NormalTexture;
 	eastl::unique_ptr<TextureReference> m_BlackTexture;
@@ -284,6 +285,8 @@ public:
 
 	inline auto& GetBlackDescriptor() const { return m_BlackTexture->texture; }
 
+	inline nvrhi::ITexture* GetWhiteTexture() const { return m_WhiteTexture->texture; }
+	inline nvrhi::ITexture* GetWhiteVolume() const { return m_WhiteVolume; }
 	inline auto& GetWhiteTextureDescriptor() const { return m_WhiteTexture->descriptorHandle; }
 	inline auto& GetGrayTextureDescriptor() const { return m_GrayTexture->descriptorHandle; }
 	inline auto& GetNormalTextureDescriptor() const { return m_NormalTexture->descriptorHandle; }

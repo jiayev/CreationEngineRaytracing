@@ -11,9 +11,12 @@
 #include "SceneGraph.h"
 #include "Types/RE/RE.h"
 #include "interop/Triangle.hlsli"
+#include "Utils/SceneDiagnostics.h"
 
 BaseMesh::~BaseMesh()
 {
+	SceneDiagnostics::Note(SceneDiagnostics::Event::MeshReleased, Renderer::GetSingleton()->GetFrameIndex(),
+		reinterpret_cast<uint64_t>(this), m_MeshIndex, 0, m_Name.c_str());
 	auto& meshManager = Scene::GetSingleton()->GetSceneGraph()->GetMeshManager();
 
 	for (const auto& entry : m_GeometryEntries)

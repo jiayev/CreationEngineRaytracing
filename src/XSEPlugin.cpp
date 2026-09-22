@@ -3,6 +3,7 @@
 #include "Util.h"
 #include "Plugin.h"
 #include "AgilitySDK.h"
+#include "Utils/SceneDiagnostics.h"
 
 #define DLLEXPORT __declspec(dllexport)
 
@@ -32,6 +33,7 @@ void InitializeLog([[maybe_unused]] spdlog::level::level_enum a_level = spdlog::
 	log->flush_on(spdlog::level::info);
 	spdlog::set_default_logger(std::move(log));
 	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] [%s:%#] %v");
+	SceneDiagnostics::Initialize();
 }
 
 void MessageHandler(CESE::MessagingInterface::Message* message)
