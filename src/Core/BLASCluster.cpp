@@ -233,7 +233,7 @@ nvrhi::rt::AccelStructDesc BLASCluster::MakeDesc(BuildMode mode) const
 		? nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
 		: nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
 
-	if (Renderer::GetSingleton()->GetBLASCompactor() && !m_Flags.all(Flags::Updatable) && !m_RequiresUpdate) {
+	if (Renderer::GetSingleton()->UseBLASCompaction() && !m_Flags.all(Flags::Updatable) && !m_RequiresUpdate) {
 		blasDesc.buildFlags |= nvrhi::rt::AccelStructBuildFlags::AllowCompaction;
 		return blasDesc;
 	}
@@ -260,7 +260,7 @@ BLASCluster::BuildMode BLASCluster::DetermineBuildMode(SceneGraph* sceneGraph, u
 		return BuildMode::Rebuild;
 
 	if (hasUpdate) {
-		if (m_Compaction)
+		if ((m_BLAS->getDesc().buildFlags & nvrhi::rt::AccelStructBuildFlags::AllowCompaction) != 0)
 			return BuildMode::Rebuild;
 
 		if (m_UpdateCount >= Constants::MAX_BLAS_UPDATES_BEFORE_MAINTENANCE &&
@@ -287,19 +287,11 @@ nvrhi::rt::InstanceDesc BLASCluster::MakeInstanceDesc() const
 
 uint64_t BLASCluster::GetBLASDeviceAddress() const
 {
-	if (m_Compaction)
-		return m_Compaction->address;
-	if (!m_BLAS)
-		return 0;
-	if (auto* compactor = Renderer::GetSingleton()->GetBLASCompactor())
-		return compactor->GetAddress(m_BLAS);
-	return m_BLAS->getDeviceAddress();
+	return m_BLAS ? m_BLAS->getDeviceAddress() : 0;
 }
 
 uint64_t BLASCluster::GetBLASSize() const
 {
-	if (m_Compaction)
-		return m_Compaction->allocation ? m_Compaction->compactedBytes : m_Compaction->originalBytes;
 	return m_BLAS ? m_BLAS->getBufferSize() : 0;
 }
 
@@ -341,7 +333,6 @@ void BLASCluster::BuildUpdate(nvrhi::ICommandList* commandList, SceneGraph* scen
 
 	if (m_GeometryDescs.empty()) {
 		m_BLAS = nullptr;
-		m_Compaction.reset();
 		m_UncompactedBytes = 0;
 		m_LastBuildFrame = frameIndex;
 		m_DirtyFlags.reset();
@@ -370,11 +361,6 @@ void BLASCluster::BuildUpdate(nvrhi::ICommandList* commandList, SceneGraph* scen
 	nvrhi::utils::BuildBottomLevelAccelStruct(commandList, m_BLAS, blasDesc);
 	if (buildMode == BuildMode::Rebuild) {
 		m_UncompactedBytes = m_BLAS->getBufferSize();
-		m_Compaction.reset();
-		if ((blasDesc.buildFlags & nvrhi::rt::AccelStructBuildFlags::AllowCompaction) != 0) {
-			m_Compaction = renderer->GetBLASCompactor()->Request(m_BLAS);
-			m_BLAS = nullptr;
-		}
 	}
 	SceneDiagnostics::Note(SceneDiagnostics::Event::Build, frameIndex, reinterpret_cast<uint64_t>(this),
 		GetBLASDeviceAddress(), static_cast<uint64_t>(buildMode), m_Name.c_str());

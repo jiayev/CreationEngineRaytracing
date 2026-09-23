@@ -2,7 +2,6 @@
 
 #include "Core/Mesh/BaseMesh.h"
 #include "Constants.h"
-#include "Core/BLASCompactor.h"
 
 #include "Instance.hlsli"
 #include "Light.hlsli"
@@ -50,7 +49,6 @@ protected:
 	eastl::vector<uint16_t> m_GeometrySlots;
 
 	nvrhi::rt::AccelStructHandle m_BLAS;
-	std::shared_ptr<BLASCompactor::Record> m_Compaction;
 
 	eastl::string m_Name;
 
@@ -86,11 +84,10 @@ protected:
 	void SetValid(bool valid) { m_IsValid = valid; }
 public:
 	explicit BLASCluster(RE::TESObjectREFR* owner);
-	bool HasBLAS() const { return m_BLAS || m_Compaction; }
+	bool HasBLAS() const { return m_BLAS != nullptr; }
 	uint64_t GetBLASDeviceAddress() const;
 	uint64_t GetBLASSize() const;
 	const auto& GetBLAS() const { return m_BLAS; }
-	const auto& GetCompaction() const { return m_Compaction; }
 
 	void AddMember(BaseMesh* mesh);
 	void RemoveMember(BaseMesh* mesh);

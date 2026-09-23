@@ -205,14 +205,6 @@ void Renderer::PostInitialize()
 
 	logger::info("Supported Features: {}", features);
 
-#if CER_VULKAN_BLAS_COMPACTION
-	if (IsVulkan() && SupportsFeature(nvrhi::Feature::RayTracingAccelStruct)) {
-		m_BLASCompactor = std::make_unique<BLASCompactor>(m_NVRHIDevice);
-		if (!m_BLASCompactor->IsAvailable())
-			m_BLASCompactor.reset();
-	}
-#endif
-
 	// Keep the ray tracing backend selection consistent with device support.
 	if (m_Settings.UseRayQuery && !SupportsFeature(nvrhi::Feature::RayQuery)) {
 		logger::warn("Device does not support ray queries; using the ray tracing pipeline instead.");
@@ -721,10 +713,6 @@ void Renderer::EndExecution()
 	const uint64_t fenceValue = SubmitCommandList(m_CommandList);
 
 	auto& slot = m_FrameSlots[m_CurrentSlot];
-	if (m_BLASCompactor) {
-		slot.releaseBuildScratch = m_BLASCompactor->ShouldReleaseBuildScratch();
-		m_BLASCompactor->Submitted(fenceValue);
-	}
 	slot.fenceValue = fenceValue;
 	device->setEventQuery(slot.eventQuery, nvrhi::CommandQueue::Graphics, fenceValue);
 	slot.inFlight = true;
@@ -793,12 +781,6 @@ void Renderer::RunPostExecutionForSlot(uint32_t slot)
 	}
 
 	device->runGarbageCollection();
-	if (m_BLASCompactor)
-		m_BLASCompactor->Collect();
-	if (m_FrameSlots[slot].releaseBuildScratch) {
-		m_FrameSlots[slot].commandList = nullptr;
-		m_FrameSlots[slot].releaseBuildScratch = false;
-	}
 
 	logger::trace("Renderer::RunPostExecutionForSlot - Slot {} completed", slot);
 }

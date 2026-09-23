@@ -1057,17 +1057,15 @@ void SceneGraph::BuildClusters(nvrhi::ICommandList* commandList)
 			if (cluster->HasBLAS()) {
 				bytes += cluster->GetBLASSize();
 				uncompactedBytes += cluster->m_UncompactedBytes;
-				if (cluster->m_Compaction && cluster->m_Compaction->allocation)
+				if (cluster->m_BLAS->isCompacted())
 					++compacted;
-				else if (cluster->m_Compaction)
+				else if ((cluster->m_BLAS->getDesc().buildFlags & nvrhi::rt::AccelStructBuildFlags::AllowCompaction) != 0)
 					++pendingCompaction;
 				++count;
 			}
 		}
 		logger::info("[VRAM] Scene BLAS: {} structures, {} compacted, {} uncompressed static, {:.1f} MiB / {:.1f} MiB before compaction (excluding pool slack, scratch and retired resources)",
 			count, compacted, pendingCompaction, bytes / 1048576.0, uncompactedBytes / 1048576.0);
-		if (auto* compactor = Renderer::GetSingleton()->GetBLASCompactor())
-			compactor->LogStats();
 	}
 }
 

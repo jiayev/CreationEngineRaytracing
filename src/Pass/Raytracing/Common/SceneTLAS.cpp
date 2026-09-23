@@ -111,13 +111,10 @@ namespace Pass
 
 		commandList->writeBuffer(m_RaytracingBuffer, m_RaytracingData.get(), sizeof(RaytracingData));
 
-		auto* compactor = GetRenderer()->GetBLASCompactor();
-		if (compactor)
-			compactor->BeginFrame(commandList);
+		if (GetRenderer()->UseBLASCompaction())
+			commandList->compactBottomLevelAccelStructs();
 
 		sceneGraph->BuildClusters(commandList);
-		if (compactor)
-			compactor->EndBuilds(commandList);
 
 		m_TopLevelAS.Update(commandList, sceneGraph->GetAllClusters());
 	}
