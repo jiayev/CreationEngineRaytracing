@@ -1,4 +1,5 @@
 #include "Core/BLASCluster.h"
+#include "Core/BLASSharing.h"
 #include "Scene.h"
 #include "SceneGraph.h"
 #include "Renderer.h"
@@ -332,6 +333,7 @@ void BLASCluster::BuildUpdate(nvrhi::ICommandList* commandList, SceneGraph* scen
 		m_UpdateCount++;
 
 	if (m_GeometryDescs.empty()) {
+		m_SharedBLAS.reset();
 		m_BLAS = nullptr;
 		m_UncompactedBytes = 0;
 		m_LastBuildFrame = frameIndex;
@@ -344,7 +346,8 @@ void BLASCluster::BuildUpdate(nvrhi::ICommandList* commandList, SceneGraph* scen
 	auto blasDesc = MakeDesc(buildMode);
 	blasDesc.bottomLevelGeometries = m_GeometryDescs;
 
-	bool needsAllocation = allocate;
+	bool needsAllocation = allocate || m_SharedBLAS != nullptr;
+	m_SharedBLAS.reset();
 	if (!needsAllocation && buildMode == BuildMode::Rebuild) {
 		const auto previousFlags = m_BLAS->getDesc().buildFlags;
 		needsAllocation = (previousFlags & nvrhi::rt::AccelStructBuildFlags::AllowCompaction) != 0 ||
@@ -361,6 +364,7 @@ void BLASCluster::BuildUpdate(nvrhi::ICommandList* commandList, SceneGraph* scen
 	nvrhi::utils::BuildBottomLevelAccelStruct(commandList, m_BLAS, blasDesc);
 	if (buildMode == BuildMode::Rebuild) {
 		m_UncompactedBytes = m_BLAS->getBufferSize();
+		m_LastRebuildFrame = frameIndex;
 	}
 	SceneDiagnostics::Note(SceneDiagnostics::Event::Build, frameIndex, reinterpret_cast<uint64_t>(this),
 		GetBLASDeviceAddress(), static_cast<uint64_t>(buildMode), m_Name.c_str());

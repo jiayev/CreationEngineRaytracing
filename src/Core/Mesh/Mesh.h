@@ -10,6 +10,13 @@ protected:
 public:
 	Mesh(RE::BSTriShape* bsTriShape, nvrhi::ICommandList* commandList);
 
+	bool GetStaticBuffers(const BufferDescriptor*& vertices, const BufferDescriptor*& indices) const override
+	{
+		vertices = &m_VertexBuffer;
+		indices = &m_IndexBuffer;
+		return !IsUpdatable();
+	}
+
 	uint16_t GetIndexID([[maybe_unused]] size_t geometryIndex) const override { return static_cast<uint16_t>(m_IndexBuffer.m_Descriptor.Get()); }
 
 	uint16_t GetVertexID() const override { return static_cast<uint16_t>(m_VertexBuffer.m_Descriptor.Get()); }

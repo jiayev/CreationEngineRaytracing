@@ -2,6 +2,7 @@
 
 #include "Core/Mesh/BaseMesh.h"
 #include "Core/BLASCluster.h"
+#include "Core/BLASSharing.h"
 #include "Core/ThreadPool.h"
 
 #include "Core/MeshManager.h"
@@ -60,6 +61,7 @@ class SceneGraph
 	ankerl::unordered_dense::map<SubIndexSegmentMesh*, eastl::unique_ptr<BLASCluster>> m_SubIndexSegmentClusters;
 
 	eastl::vector<BLASCluster*> m_AllClusters;
+	BLASSharing m_BLASSharing;
 
 	// Phase G scratch (sized to m_AllClusters each frame): one entry per cluster with its counts and
 	// assigned mesh/instance base offsets. firstMesh/firstInstance = UINT32_MAX mark an invalid
@@ -209,6 +211,7 @@ public:
 
 	// Builds/refits the per-owner BLAS clusters; called from the SceneTLAS pass before the TLAS build.
 	void BuildClusters(nvrhi::ICommandList* commandList);
+	void OnBLASSharingSubmitted(uint64_t frame, uint64_t fence) { m_BLASSharing.OnSubmitted(frame, fence); }
 
 	auto GetMaterial(RE::BSShaderProperty* shaderProperty) { return m_MaterialManager->Get(shaderProperty); }
 

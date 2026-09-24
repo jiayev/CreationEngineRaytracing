@@ -711,6 +711,7 @@ void Renderer::EndExecution()
 	auto device = GetDevice();
 
 	const uint64_t fenceValue = SubmitCommandList(m_CommandList);
+	Scene::GetSingleton()->GetSceneGraph()->OnBLASSharingSubmitted(m_FrameIndex, fenceValue);
 
 	auto& slot = m_FrameSlots[m_CurrentSlot];
 	slot.fenceValue = fenceValue;

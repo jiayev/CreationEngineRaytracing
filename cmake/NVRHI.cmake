@@ -41,8 +41,10 @@ endif()
 FetchContent_MakeAvailable(nvrhi)
 
 option(CER_VULKAN_BLAS_COMPACTION "Compact static Vulkan BLAS" ON)
+option(CER_VULKAN_BLAS_SHARING "Share identical static Vulkan BLAS" ON)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     CER_WITH_RTXMU=$<BOOL:${CER_WITH_RTXMU}>
+    CER_VULKAN_BLAS_SHARING=$<BOOL:${CER_VULKAN_BLAS_SHARING}>
     CER_VULKAN_BLAS_COMPACTION=$<BOOL:${CER_VULKAN_BLAS_COMPACTION}>)
 
 if (NVRHI_WITH_AFTERMATH)

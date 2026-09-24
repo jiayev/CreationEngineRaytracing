@@ -1002,6 +1002,11 @@ BLASCluster* SceneGraph::GetOrCreateSegmentCluster(SubIndexSegmentMesh* segment,
 
 void SceneGraph::BuildClusters(nvrhi::ICommandList* commandList)
 {
+	for (auto* cluster : m_AllClusters) {
+		if (cluster->m_DirtyFlags != DirtyFlags::None)
+			cluster->m_SharingRequest.reset();
+	}
+	m_BLASSharing.BeginFrame();
 	// Visit every cluster with pending dirty flags. Flags are set on membership changes (Mesh) and
 	// mesh flag commits, and only cleared inside BuildUpdate - so non-None always means a build is
 	// needed. m_AllClusters was rebuilt in Phase G after empty clusters were dropped. The scan runs
@@ -1047,14 +1052,36 @@ void SceneGraph::BuildClusters(nvrhi::ICommandList* commandList)
 	}
 
 	const auto frameIndex = Renderer::GetSingleton()->GetFrameIndex();
+	for (auto* cluster : m_AllClusters) {
+		if (cluster->Valid() && cluster->m_LastRebuildFrame == frameIndex)
+			m_BLASSharing.Capture(*cluster, commandList);
+		if (const auto& request = cluster->m_SharingRequest; request && request->entry && request->original == cluster->m_BLAS &&
+			request->original->isCompacted() && request->entry->blas->isCompacted()) {
+			cluster->m_SharedBLAS = request->entry;
+			cluster->m_BLAS = request->entry->blas;
+			cluster->m_UncompactedBytes = request->entry->uncompactedBytes;
+			cluster->m_SharingRequest.reset();
+		} else if (request && !request->entry && request->queued && request->transfersRemaining == 0) {
+			cluster->m_SharingRequest.reset();
+		}
+	}
+	m_BLASSharing.EndFrame(commandList);
 	if (frameIndex <= 2 || frameIndex % 600 == 0) {
 		uint64_t bytes = 0;
 		uint64_t uncompactedBytes = 0;
 		uint32_t count = 0;
 		uint32_t compacted = 0;
 		uint32_t pendingCompaction = 0;
+		uint32_t references = 0;
+		uint64_t sharedBytes = 0;
+		eastl::unordered_set<nvrhi::rt::IAccelStruct*> uniqueBLAS;
 		for (const auto* cluster : m_AllClusters) {
 			if (cluster->HasBLAS()) {
+				++references;
+				if (!uniqueBLAS.insert(cluster->m_BLAS.Get()).second) {
+					sharedBytes += cluster->GetBLASSize();
+					continue;
+				}
 				bytes += cluster->GetBLASSize();
 				uncompactedBytes += cluster->m_UncompactedBytes;
 				if (cluster->m_BLAS->isCompacted())
@@ -1066,6 +1093,9 @@ void SceneGraph::BuildClusters(nvrhi::ICommandList* commandList)
 		}
 		logger::info("[VRAM] Scene BLAS: {} structures, {} compacted, {} uncompressed static, {:.1f} MiB / {:.1f} MiB before compaction (excluding pool slack, scratch and retired resources)",
 			count, compacted, pendingCompaction, bytes / 1048576.0, uncompactedBytes / 1048576.0);
+		logger::info("[VRAM] Shared BLAS: {} cluster references, {} unique structures, {:.1f} MiB duplicate AS equivalent (excluding retired resources)",
+			references, count, sharedBytes / 1048576.0);
+		m_BLASSharing.LogStats();
 	}
 }
 

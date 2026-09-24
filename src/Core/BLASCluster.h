@@ -7,8 +7,12 @@
 #include "Light.hlsli"
 
 #include <mutex>
+#include <memory>
 
 class SceneGraph;
+class BLASSharing;
+struct SharedBLASRequest;
+struct SharedBLASEntry;
 
 struct Light;
 
@@ -49,6 +53,8 @@ protected:
 	eastl::vector<uint16_t> m_GeometrySlots;
 
 	nvrhi::rt::AccelStructHandle m_BLAS;
+	std::shared_ptr<SharedBLASRequest> m_SharingRequest;
+	std::shared_ptr<SharedBLASEntry> m_SharedBLAS;
 
 	eastl::string m_Name;
 
@@ -60,10 +66,12 @@ protected:
 	RE::NiBound m_WorldBound;
 
 	friend class SceneGraph;
+	friend class BLASSharing;
 
 	uint32_t m_UpdateCount = 0;
 	uint64_t m_UncompactedBytes = 0;
 	uint64_t m_LastBuildFrame = Constants::INVALID_FRAME_INDEX;
+	uint64_t m_LastRebuildFrame = Constants::INVALID_FRAME_INDEX;
 
 	// TLAS instance slot, assigned during SceneGraph::Update population
 	uint32_t m_InstanceIndex = 0; 

@@ -96,6 +96,13 @@ public:
 	// True for meshes whose vertex data changes per frame, so their cluster BLAS must be refit.
 	virtual bool IsUpdatable() const { return false; }
 
+	virtual bool GetStaticBuffers(const BufferDescriptor*& vertices, const BufferDescriptor*& indices) const
+	{
+		vertices = nullptr;
+		indices = nullptr;
+		return false;
+	}
+
 	bool IsTwoSided();
 
 	// Returns the mesh's geometry entries (desc + geometry slot index).
