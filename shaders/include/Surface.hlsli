@@ -55,6 +55,7 @@ struct Surface
 
     float3 FuzzColor;
     float FuzzWeight;
+    float FuzzRoughness;
 
 #if defined(GLINT)
     float GlintScreenSpaceScale;

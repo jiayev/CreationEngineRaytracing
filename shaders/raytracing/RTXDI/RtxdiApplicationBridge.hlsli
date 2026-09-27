@@ -69,7 +69,7 @@ static const float RAB_BACKGROUND_DEPTH = 1e4f;
 // ---------------------------------------------------------------------------
 Surface PSD_UnpackToSurface(PackedSurfaceData d)
 {
-    Surface s;
+    Surface s = (Surface)0;
     s.Primary      = true;
     s.Position     = d.posW;
     s.Normal       = PSD_UnpackOct(d.packedNormal);

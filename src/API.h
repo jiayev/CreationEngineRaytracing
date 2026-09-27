@@ -18,6 +18,7 @@ extern "C" {
 	CERT_API void SetSkyHemisphere(void* skyHemi);
 	CERT_API bool SetPhysicalSkyResources(void* transmittance, void* cloudShadow);
 	CERT_API void SetSkinDetailNormal(void* skinDetailNormal);
+	CERT_API void SetSkinTextureResolver(void* (*resolver)(const void*));
 	CERT_API void SetWaterFlowMap(void* waterFlowMap);
 	CERT_API void GetPassTimings(eastl::vector<PassTiming>&);
 	CERT_API void GetSceneGraphCounters(uint32_t& textures, uint32_t& models, uint32_t& instances);

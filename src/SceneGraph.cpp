@@ -557,6 +557,9 @@ void SceneGraph::Update(nvrhi::ICommandList* commandList)
 		const size_t totalWork = m_UpdateList.size();
 		const size_t totalCreate = m_CreateList.size();
 
+		for (const auto& entry : m_UpdateList)
+			entry.first->PrepareMaterial();
+
 		auto doUpdate = [&](auto& entry) {
 			auto& [mesh, refr] = entry;
 			mesh->SetLastVisitedFrame(frameIndex);

@@ -47,15 +47,13 @@ void MaterialBase::UpdateTextures([[ maybe_unused ]] RE::BSShaderMaterial* shade
 
 void MaterialBase::Update(RE::BSShaderMaterial* shaderMaterial)
 {
-	{
-		std::scoped_lock lock(m_UpdateMutex);
+	std::scoped_lock lock(m_UpdateMutex);
 
-		const auto& frameIndex = Renderer::GetSingleton()->GetFrameIndex();
-		if (m_LastUpdate == frameIndex)
-			return;
+	const auto& frameIndex = Renderer::GetSingleton()->GetFrameIndex();
+	if (m_LastUpdate == frameIndex)
+		return;
 
-		m_LastUpdate = frameIndex;
-	}
+	m_LastUpdate = frameIndex;
 
 	UpdateData(shaderMaterial);
 	UpdateTextures(shaderMaterial);

@@ -37,4 +37,12 @@ void FacegenMaterial::UpdateTextures(RE::BSShaderMaterial* shaderMaterial)
 
 	if (m_SubsurfaceTexture.Update(facegenMaterial->subsurfaceTexture, renderer->GetBlackTextureDescriptor()))
 		facegenData->SubsurfaceTexture = m_SubsurfaceTexture.texture.GetDescriptorIndex();
+
+	if (m_RFAOSTexture.Update(m_RFAOSSource, renderer->GetWhiteTextureDescriptor()))
+		facegenData->RFAOSTexture = m_RFAOSTexture.texture.GetDescriptorIndex();
+}
+
+void FacegenMaterial::PrepareTextures(RE::BSShaderMaterial* shaderMaterial)
+{
+	m_RFAOSSource.reset(MaterialManager::GetSkinTexture(shaderMaterial));
 }

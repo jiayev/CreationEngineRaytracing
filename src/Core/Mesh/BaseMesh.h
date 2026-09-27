@@ -143,6 +143,7 @@ public:
 	CESEAdapter::REX::EnumSet<DirtyFlags> GetDirtyFlags() const { return m_DirtyFlags; }
 
 	void WriteProperties() const;
+	void PrepareMaterial();
 
 	void MarkDirty(DirtyFlags flag);
 
@@ -253,4 +254,5 @@ protected:
 	Properties m_Properties;
 
 	eastl::shared_ptr<MaterialBase> m_Material;
+	RE::BSShaderMaterial* m_SourceMaterial = nullptr;
 };

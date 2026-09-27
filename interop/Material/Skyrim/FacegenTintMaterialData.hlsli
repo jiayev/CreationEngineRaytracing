@@ -7,14 +7,16 @@
 INTEROP_STRUCT(FacegenTintMaterialDataExtra, 4)
 {
     half3 TintColor;
-    half Pad;
+    uint16_t RFAOSTexture;
 };
 VALIDATE_ALIGNMENT(FacegenTintMaterialDataExtra, 4);
+VALIDATE_SIZE(FacegenTintMaterialDataExtra, 8);
+VALIDATE_OFFSET(FacegenTintMaterialDataExtra, RFAOSTexture, 6);
 
 INTEROP_STRUCT(FacegenTintMaterialData : LightingMaterialData, 4)
 {
     half3 TintColor;
-    half Pad;
+    uint16_t RFAOSTexture;
 };
 VALIDATE_ALIGNMENT(FacegenTintMaterialData, 4);
 VALIDATE_SIZE(FacegenTintMaterialData, sizeof(LightingMaterialData) + sizeof(FacegenTintMaterialDataExtra));

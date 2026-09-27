@@ -204,7 +204,7 @@ float CharlieDirectionalAlbedo(float cosTheta, float roughness)
 struct FuzzReflection
 {
     float3 albedo;      ///< Fuzz color (tint).
-    float roughness;    ///< Fuzz roughness (uses surface base roughness).
+    float roughness;
 
     float3 Eval(const float3 wi, const float3 wo)
     {
@@ -692,7 +692,7 @@ struct DefaultBSDF
         // Fuzz layer: OpenPBR §3.7 microfiber sheen on top of base substrate
         fuzzWeight = 0;
         fuzzReflection.albedo = float3(0, 0, 0);
-        fuzzReflection.roughness = surfaceRoughness;
+        fuzzReflection.roughness = surface.FuzzRoughness >= 0.0f ? saturate(surface.FuzzRoughness) : surfaceRoughness;
         if (surface.FuzzWeight > 0.0f)
         {
             fuzzWeight = surface.FuzzWeight;
@@ -701,8 +701,8 @@ struct DefaultBSDF
             // OpenPBR eq.(81): base *= lerp(1, 1 - E_fuzz(μ_o, α), fuzzWeight)
             // E_fuzz is the view-dependent directional albedo of the fuzz BRDF.
             float NdotV = saturate(dot(N, V));
-            float Efuzz = CharlieDirectionalAlbedo(NdotV, surfaceRoughness);
-            float fuzzAttenuation = lerp(1.0f, 1.0f - Efuzz, fuzzWeight);
+            float Efuzz = CharlieDirectionalAlbedo(NdotV, fuzzReflection.roughness);
+            float fuzzAttenuation = saturate(1.0f - Efuzz * fuzzWeight);
             diffuseReflection.albedo *= fuzzAttenuation;
             specularReflection.albedo *= fuzzAttenuation;
         }

@@ -136,13 +136,15 @@ void LightingMaterial(inout Surface surface, in float2 texCoord0, in float4 vert
         );
     }
 
+    float skinDetailAO = 1.0f;
     [branch]
     if (SKINSETTINGS.skinDetailParams.w > 0.0f && skinEnabled)
     {
         const float2 detailUV = texCoord0 * SKINSETTINGS.skinDetailParams.x * (material.Feature == Feature::kFaceGen ? 1.0f : SKINSETTINGS.skinDetailParams.y);
         
         // Tangent space normal map with invalid .z channel
-        const float2 detailNormalXY = (SkinDetailNormal.SampleLevel(DefaultSampler, detailUV, mipLevel).xy * 2.0f - 1.0f) * SKINSETTINGS.skinDetailParams.z;
+        const float2 detailNormalXY = (SkinDetailNormal.SampleLevel(DefaultSampler, detailUV, max(mipLevel - 1.0f, 0.0f)).xy * 2.0f - 1.0f) * SKINSETTINGS.skinDetailParams.z;
+        skinDetailAO = SkinDetailNormal.SampleLevel(DefaultSampler, detailUV, mipLevel).a;
         const float3 detailNormal = float3(detailNormalXY, sqrt(saturate(1.0f - dot(detailNormalXY, detailNormalXY))));
 
         // This method works for both model space and tangent space normal maps
@@ -337,11 +339,11 @@ void LightingMaterial(inout Surface surface, in float2 texCoord0, in float4 vert
             surface.Albedo *= SRGBColorToLinear(hair.TintColor);
         }
     
+        float specularStrength = 0.0f;
         [branch]
         if (props.ShaderFlags & ShaderFlags::kSpecular)
         {
             float3 specularColor = SRGBColorToLinear(material.SpecularColor);
-            float specularStrength = 0;
             
             [branch]
             if (props.ShaderFlags & ShaderFlags::kModelSpaceNormals)
@@ -476,20 +478,36 @@ void LightingMaterial(inout Surface surface, in float2 texCoord0, in float4 vert
 
             if (skinEnabled)
             {
-                Texture2D rfaosTexture = Textures[0]; // TODO: RFAOSTexture — CS skin feature not yet in typed struct
+                uint16_t rfaosIndex;
+                if (material.Feature == Feature::kFaceGen)
+                {
+                    FacegenMaterialDataExtra skin = Materials[0].Load<FacegenMaterialDataExtra>(mesh.GetMaterialOffset() + kLightingSize);
+                    rfaosIndex = skin.RFAOSTexture;
+                }
+                else
+                {
+                    FacegenTintMaterialDataExtra skin = Materials[0].Load<FacegenTintMaterialDataExtra>(mesh.GetMaterialOffset() + kLightingSize);
+                    rfaosIndex = skin.RFAOSTexture;
+                }
+                Texture2D rfaosTexture = Textures[NonUniformResourceIndex(rfaosIndex)];
                 uint2 rfaosDimensions;
                 rfaosTexture.GetDimensions(rfaosDimensions.x, rfaosDimensions.y);
-                bool hasValidRFAOS = rfaosDimensions.x > 32 && rfaosDimensions.y > 32;
+                bool hasValidRFAOS = rfaosDimensions.x > 32 && rfaosDimensions.y > 32 && SKINSETTINGS.skinParams.x > 0.0f;
 
                 surface.Albedo *= SKINSETTINGS.skinParams2.w;
-                surface.Roughness = SKINSETTINGS.skinParams.x;
+                surface.Roughness = saturate(SKINSETTINGS.skinParams.x - SKINSETTINGS.skinParams.z * specularStrength);
                 surface.F0 = SKINSETTINGS.skinParams2.zzz;
+                surface.AO = skinDetailAO;
+                surface.FuzzWeight = SKINSETTINGS.fuzzParams.x;
+                surface.FuzzRoughness = SKINSETTINGS.fuzzParams.y;
+                surface.FuzzColor = SKINSETTINGS.fuzzParams.zzz;
 
                 // Skin coat layer (second specular lobe)
                 surface.CoatStrength = SKINSETTINGS.skinParams2.x;
                 surface.CoatRoughness = SKINSETTINGS.skinParams.y;
-                surface.CoatF0 = float3(0.04, 0.04, 0.04);
                 surface.CoatNormal = surface.Normal;
+                surface.CoatTangent = surface.Tangent;
+                surface.CoatBitangent = surface.Bitangent;
 
                 if (hasValidRFAOS)
                 {
@@ -497,8 +515,15 @@ void LightingMaterial(inout Surface surface, in float2 texCoord0, in float4 vert
                     surface.Roughness = rfaos.x * SKINSETTINGS.physicalParams.x;
                     surface.CoatRoughness = rfaos.x * SKINSETTINGS.physicalParams.y;
                     surface.F0 = 0.08 * rfaos.w * SKINSETTINGS.physicalParams.z;
-                    surface.AO = rfaos.z;
+                    surface.FuzzWeight *= rfaos.y;
+                    surface.AO *= rfaos.z;
                 }
+
+                float NdotV = saturate(dot(surface.Normal, viewDir));
+                float edgeRoughness = (0.04f + 0.96f * pow(1.0f - NdotV, 5.0f)) * SKINSETTINGS.fuzzParams.w;
+                surface.Roughness = saturate(surface.Roughness + edgeRoughness);
+                surface.CoatRoughness = saturate(surface.CoatRoughness + edgeRoughness);
+                surface.CoatF0 = surface.F0;
             }
             else
             {

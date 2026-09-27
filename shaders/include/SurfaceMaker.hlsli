@@ -254,6 +254,7 @@ struct SurfaceMaker
         surface.CoatBitangent = bitangentWS;
         surface.FuzzColor = float3(0.0f, 0.0f, 0.0f);
         surface.FuzzWeight = 0.0f;
+        surface.FuzzRoughness = -1.0f;
     
         if (material.Feature == Feature::kMultiTexLand || material.Feature == Feature::kMultiTexLandLODBlend)
         {
@@ -343,6 +344,7 @@ struct SurfaceMaker
         surface.CoatBitangent = bitangentWS;
         surface.FuzzColor = float3(0.0f, 0.0f, 0.0f);
         surface.FuzzWeight = 0.0f;
+        surface.FuzzRoughness = -1.0f;
 
 #   if defined(SKYRIM)
         if (material.Feature == Feature::kMultiTexLand || material.Feature == Feature::kMultiTexLandLODBlend)
@@ -458,6 +460,7 @@ struct SurfaceMaker
         surface.CoatBitangent = bitangent;
         surface.FuzzColor = float3(0.0f, 0.0f, 0.0f);
         surface.FuzzWeight = 0.0f;
+        surface.FuzzRoughness = -1.0f;
 
 #if defined(GLINT)
         surface.GlintScreenSpaceScale = 1.0f;

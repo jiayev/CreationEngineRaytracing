@@ -9,6 +9,7 @@ struct MaterialTexture
 {
 	Texture texture;
 	RE::NiTexture* sourceTexture = nullptr;
+	ID3D11Resource* sourceResource = nullptr;
 
 	bool Update(const RE::NiPointer<RE::NiSourceTexture>& a_sourceTexture, const eastl::shared_ptr<DescriptorHandle> a_defaultDescriptor, TextureType a_type = TextureType::Standard);
 	bool Update(RE::NiTexture* a_sourceTexture, const eastl::shared_ptr<DescriptorHandle> a_defaultDescriptor, TextureType a_type = TextureType::Standard);

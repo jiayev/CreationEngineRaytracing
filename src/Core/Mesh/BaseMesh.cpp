@@ -442,18 +442,46 @@ void BaseMesh::CreateMaterial()
 {
 	auto shaderProperty = Util::Adapter::GetGeometryRuntimeData(m_BSTriShape).shaderProperty;
 	m_Material = Scene::GetSingleton()->GetSceneGraph()->GetMaterial(shaderProperty);
+
+	auto* shaderMaterial = shaderProperty->material;
+	if (shaderMaterial->GetType() == RE::BSShaderMaterial::Type::kWater)
+		m_SourceMaterial = shaderMaterial;
+#if defined(SKYRIM)
+	else if (shaderMaterial->GetType() == RE::BSShaderMaterial::Type::kLighting) {
+		switch (shaderMaterial->GetFeature()) {
+		case RE::BSShaderMaterial::Feature::kHairTint:
+		case RE::BSShaderMaterial::Feature::kFaceGen:
+		case RE::BSShaderMaterial::Feature::kFaceGenRGBTint:
+			m_SourceMaterial = shaderMaterial;
+			break;
+		default:
+			break;
+		}
+	}
+#endif
+	PrepareMaterial();
+}
+
+void BaseMesh::PrepareMaterial()
+{
+	if (!m_Material || !m_SourceMaterial)
+		return;
+
+	auto* shaderProperty = Util::Adapter::GetGeometryRuntimeData(m_BSTriShape).shaderProperty;
+	if (shaderProperty && shaderProperty->material == m_SourceMaterial)
+		m_Material->PrepareTextures(shaderProperty->material);
 }
 
 void BaseMesh::UpdateMaterial()
 {
-	if (!m_Material)
+	if (!m_Material || !m_SourceMaterial)
 		return;
 
-	// Only update water for now, saves some precious CPU time which we cannot afford (yet)
-	if (m_Material->GetData()->Type != MaterialBase::Type::Water)
+	auto* shaderProperty = Util::Adapter::GetGeometryRuntimeData(m_BSTriShape).shaderProperty;
+	if (!shaderProperty || shaderProperty->material != m_SourceMaterial)
 		return;
 
-	m_Material->Update(Util::Adapter::GetGeometryRuntimeData(m_BSTriShape).shaderProperty->material);
+	m_Material->Update(shaderProperty->material);
 }
 
 bool BaseMesh::AllocateMeshIndex()

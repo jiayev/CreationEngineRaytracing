@@ -34,6 +34,7 @@ struct MaterialBase
 	virtual void UpdateData(RE::BSShaderMaterial* shaderMaterial);
 
 	virtual void UpdateTextures(RE::BSShaderMaterial* shaderMaterial);
+	virtual void PrepareTextures([[maybe_unused]] RE::BSShaderMaterial* shaderMaterial) {}
 
 	virtual Data* GetData() { return m_Data.get(); }
 

@@ -45,6 +45,23 @@
 
 #include <typeinfo>
 
+#if defined(SKYRIM)
+namespace
+{
+	void* (*skinTextureResolver)(const void*) = nullptr;
+}
+
+void MaterialManager::SetSkinTextureResolver(void* (*resolver)(const void*))
+{
+	skinTextureResolver = resolver;
+}
+
+RE::NiSourceTexture* MaterialManager::GetSkinTexture(RE::BSShaderMaterial* material)
+{
+	return skinTextureResolver ? static_cast<RE::NiSourceTexture*>(skinTextureResolver(material)) : nullptr;
+}
+#endif
+
 MaterialManager::MaterialManager()
 	: m_Slots(kSizeReference, Constants::NUM_MATERIALS_MIN, Constants::NUM_MATERIALS_STEP)
 {

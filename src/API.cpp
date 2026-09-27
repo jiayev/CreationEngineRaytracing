@@ -77,6 +77,13 @@ void SetSkinDetailNormal(void* skinDetailNormal)
 	scene->SetSkinDetailNormal(skinDetailNormal);
 }
 
+void SetSkinTextureResolver([[maybe_unused]] void* (*resolver)(const void*))
+{
+#if defined(SKYRIM)
+	MaterialManager::SetSkinTextureResolver(resolver);
+#endif
+}
+
 void SetWaterFlowMap(void* waterFlowMap)
 {
 	auto* scene = Scene::GetSingleton();
