@@ -421,8 +421,9 @@ namespace Hooks
 	{
 		static void thunk(T* cullingProcess, RE::BSGeometry* geometry, uint32_t a_arg2)
 		{
-			if (geometry) {
-				if (Scene::GetSingleton()->ApplyPathTracingCull() && Util::Culling::ShouldCull(geometry))
+			auto* scene = Scene::GetSingleton();
+			if (geometry && (cullingProcess->cameraRelatedUpdates || scene->ApplyFullPathTracingCull())) {
+				if (scene->ApplyPathTracingCull() && Util::Culling::ShouldCull(geometry))
 					return;
 			}
 
@@ -433,13 +434,22 @@ namespace Hooks
 
 	void BSBatchRenderer_RenderPassImmediately::thunk(RE::BSRenderPass* pass, uint32_t technique, bool alphaTest, uint32_t renderFlags)
 	{
+		auto* scene = Scene::GetSingleton();
+		const auto depthStencil = RE::BSGraphics::RendererShadowState::GetSingleton()->GetRuntimeData().depthStencil;
+		if (!scene->ApplyFullPathTracingCull() &&
+			(depthStencil == RE::RENDER_TARGETS_DEPTHSTENCIL::kSHADOWMAPS_ESRAM ||
+			depthStencil == RE::RENDER_TARGETS_DEPTHSTENCIL::kVOLUMETRIC_LIGHTING_SHADOWMAPS_ESRAM ||
+			depthStencil == RE::RENDER_TARGETS_DEPTHSTENCIL::kSHADOWMAPS)) {
+			func(pass, technique, alphaTest, renderFlags);
+			return;
+		}
+
 		if (!pass->shader) {
 			func(pass, technique, alphaTest, renderFlags);
 			return;
 		}
 
 		const auto shaderType = pass->shader->shaderType.get();
-		auto* scene = Scene::GetSingleton();
 
 		const bool pathTracingActive = scene->IsPathTracingActive();
 
