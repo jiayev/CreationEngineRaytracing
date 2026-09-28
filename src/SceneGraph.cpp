@@ -557,9 +557,6 @@ void SceneGraph::Update(nvrhi::ICommandList* commandList)
 		const size_t totalWork = m_UpdateList.size();
 		const size_t totalCreate = m_CreateList.size();
 
-		for (const auto& entry : m_UpdateList)
-			entry.first->PrepareMaterial();
-
 		auto doUpdate = [&](auto& entry) {
 			auto& [mesh, refr] = entry;
 			mesh->SetLastVisitedFrame(frameIndex);
@@ -740,6 +737,14 @@ void SceneGraph::Update(nvrhi::ICommandList* commandList)
 	}
 
 	// Phase E: Material flush
+	const size_t textureScanCount = eastl::min<size_t>(m_PreviousVisible.size(), 64);
+	for (size_t i = 0; i < textureScanCount; ++i) {
+		if (m_MaterialTextureCursor >= m_PreviousVisible.size())
+			m_MaterialTextureCursor = 0;
+		if (m_PreviousVisible[m_MaterialTextureCursor++]->RefreshMaterialTextures())
+			break;
+	}
+
 	m_MaterialManager->Flush(commandList);
 
 	if (timings) {

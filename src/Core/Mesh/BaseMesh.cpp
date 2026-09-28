@@ -459,17 +459,18 @@ void BaseMesh::CreateMaterial()
 		}
 	}
 #endif
-	PrepareMaterial();
 }
 
-void BaseMesh::PrepareMaterial()
+bool BaseMesh::RefreshMaterialTextures()
 {
 	if (!m_Material || !m_SourceMaterial)
-		return;
+		return false;
 
 	auto* shaderProperty = Util::Adapter::GetGeometryRuntimeData(m_BSTriShape).shaderProperty;
 	if (shaderProperty && shaderProperty->material == m_SourceMaterial)
-		m_Material->PrepareTextures(shaderProperty->material);
+		return m_Material->RefreshTextures(shaderProperty->material);
+
+	return false;
 }
 
 void BaseMesh::UpdateMaterial()

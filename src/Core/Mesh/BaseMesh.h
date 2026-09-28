@@ -143,7 +143,7 @@ public:
 	CESEAdapter::REX::EnumSet<DirtyFlags> GetDirtyFlags() const { return m_DirtyFlags; }
 
 	void WriteProperties() const;
-	void PrepareMaterial();
+	bool RefreshMaterialTextures();
 
 	void MarkDirty(DirtyFlags flag);
 

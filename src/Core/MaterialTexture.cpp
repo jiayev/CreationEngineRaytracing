@@ -2,12 +2,12 @@
 #include "Core/MaterialManager.h"
 #include "Utils/Adapter.h"
 
-bool MaterialTexture::Update(const RE::NiPointer<RE::NiSourceTexture>& a_sourceTexture, const eastl::shared_ptr<DescriptorHandle> a_defaultDescriptor, TextureType a_type)
+bool MaterialTexture::Update(const RE::NiPointer<RE::NiSourceTexture>& a_sourceTexture, const eastl::shared_ptr<DescriptorHandle>& a_defaultDescriptor, TextureType a_type)
 {
 	return Update(reinterpret_cast<RE::NiTexture*>(a_sourceTexture.get()), a_defaultDescriptor, a_type);
 }
 
-bool MaterialTexture::Update(RE::NiTexture* a_sourceTexture, const eastl::shared_ptr<DescriptorHandle> a_defaultDescriptor, TextureType a_type)
+bool MaterialTexture::Update(RE::NiTexture* a_sourceTexture, const eastl::shared_ptr<DescriptorHandle>& a_defaultDescriptor, TextureType a_type)
 {
 	auto* rendererTexture = Util::Adapter::GetRendererTexture(a_sourceTexture);
 	auto* resource = rendererTexture ? rendererTexture->texture : nullptr;

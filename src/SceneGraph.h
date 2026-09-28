@@ -49,6 +49,7 @@ class SceneGraph
 	ankerl::unordered_dense::map<RE::BSTriShape*, eastl::unique_ptr<BaseMesh>> m_Meshes;
 	eastl::vector<BaseMesh*> m_CurrentVisible;
 	eastl::vector<BaseMesh*> m_PreviousVisible;
+	size_t m_MaterialTextureCursor = 0;
 
 	// One BLAS instance per owner reference
 	ankerl::unordered_dense::map<RE::TESObjectREFR*, eastl::unique_ptr<BLASCluster>> m_OwnerClusters;

@@ -47,16 +47,13 @@ void MaterialBase::UpdateTextures([[ maybe_unused ]] RE::BSShaderMaterial* shade
 
 void MaterialBase::Update(RE::BSShaderMaterial* shaderMaterial)
 {
-	std::scoped_lock lock(m_UpdateMutex);
-
-	const auto& frameIndex = Renderer::GetSingleton()->GetFrameIndex();
-	if (m_LastUpdate == frameIndex)
+	const auto frameIndex = Renderer::GetSingleton()->GetFrameIndex();
+	auto lastUpdate = m_LastUpdate.load(std::memory_order_relaxed);
+	if (lastUpdate == frameIndex ||
+		!m_LastUpdate.compare_exchange_strong(lastUpdate, frameIndex, std::memory_order_relaxed))
 		return;
 
-	m_LastUpdate = frameIndex;
-
 	UpdateData(shaderMaterial);
-	UpdateTextures(shaderMaterial);
 
 	auto manager = m_Manager.lock();
 	if (!manager) {
@@ -65,4 +62,21 @@ void MaterialBase::Update(RE::BSShaderMaterial* shaderMaterial)
 	}
 
 	manager->Update(this);
+}
+
+bool MaterialBase::RefreshTextures(RE::BSShaderMaterial* shaderMaterial)
+{
+	constexpr uint64_t refreshInterval = 120;
+	const auto frameIndex = Renderer::GetSingleton()->GetFrameIndex();
+	if (m_LastTextureUpdate != Constants::INVALID_FRAME_INDEX && frameIndex - m_LastTextureUpdate < refreshInterval)
+		return false;
+
+	m_LastTextureUpdate = frameIndex;
+	PrepareTextures(shaderMaterial);
+	UpdateTextures(shaderMaterial);
+
+	if (auto manager = m_Manager.lock())
+		manager->Update(this);
+
+	return true;
 }
